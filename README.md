@@ -84,7 +84,18 @@ Final screenshots/GIFs are not included yet. These placeholders mark the exact m
 >
 > Suggested filename: `docs/media/quoterm-vs-toast.gif`
 
-A lightweight capture sketch lives in [`examples/basic`](examples/basic/README.md). It documents a small demo app with anchored controls, success/warning/error states, and a traditional toast mock for comparison.
+A runnable comparison app lives in [`examples/comparison`](examples/comparison/README.md). It shows Quoterm beside the clicked control and compares it with `react-hot-toast`, `sonner`, and `react-toastify` across success, warning, error, async, validation, and destructive-action scenarios.
+
+Run it separately from the package root:
+
+```sh
+npm install
+cd examples/comparison
+npm install
+npm run dev
+```
+
+The example app intentionally carries its own demo dependencies. Installing or publishing the `quoterm` package remains lightweight; toast/demo dependencies must not be added to the root package runtime or peer dependencies.
 
 ## API
 
