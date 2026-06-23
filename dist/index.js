@@ -1,11 +1,10 @@
 // src/quoterm.tsx
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { jsx, jsxs } from "react/jsx-runtime";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 var DEFAULT_MAX_ITEMS = 3;
 var DEFAULT_MAX_WIDTH = 360;
 var DEFAULT_GUTTER = 16;
-var ESTIMATED_QUOTE_HEIGHT = 76;
 var nextId = 0;
 var snapshot = { items: [] };
 var listeners = /* @__PURE__ */ new Set();
@@ -97,8 +96,7 @@ function dismissQuoterm(id) {
 }
 function quoterm(input) {
   const item = normalizeItem(input);
-  const limit = Math.max(1, DEFAULT_MAX_ITEMS);
-  setSnapshot({ items: [item, ...snapshot.items.filter((existing) => existing.id !== item.id)].slice(0, limit) });
+  setSnapshot({ items: [item, ...snapshot.items.filter((existing) => existing.id !== item.id)] });
   scheduleDismiss(item.id, input.duration);
   return {
     id: item.id,
@@ -131,43 +129,17 @@ function useQuoterm() {
     [currentSnapshot]
   );
 }
-function useViewportTick(active) {
-  const [, setTick] = React.useState(0);
-  React.useEffect(() => {
-    if (!active || typeof window === "undefined") return;
-    const update = () => setTick((value) => value + 1);
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [active]);
-}
 function getDocumentPosition(item, options) {
   if (typeof window === "undefined") return { top: options.gutter, left: options.gutter, maxWidth: options.maxWidth };
   const viewportWidth = window.innerWidth || options.maxWidth + options.gutter * 2;
   const maxWidth = Math.min(options.maxWidth, viewportWidth - options.gutter * 2);
-  const sourceRect = item.sourceElement?.getBoundingClientRect() ?? item.sourceRect;
   const scrollX = window.scrollX || window.pageXOffset || 0;
   const scrollY = window.scrollY || window.pageYOffset || 0;
-  if (!sourceRect) {
-    return {
-      top: scrollY + options.gutter,
-      left: scrollX + Math.max(options.gutter, viewportWidth - maxWidth - options.gutter),
-      maxWidth
-    };
-  }
-  const gap = 8;
-  const topAbove = scrollY + sourceRect.top - ESTIMATED_QUOTE_HEIGHT - gap;
-  const topBelow = scrollY + sourceRect.bottom + gap;
-  const canFitAbove = sourceRect.top - ESTIMATED_QUOTE_HEIGHT - gap > options.gutter;
-  const placement = item.placement ?? "auto";
-  const top = placement === "bottom" || placement === "auto" && !canFitAbove ? topBelow : Math.max(scrollY + options.gutter, topAbove);
-  const leftFromSource = scrollX + sourceRect.left;
-  const maxLeft = scrollX + viewportWidth - maxWidth - options.gutter;
-  const left = Math.min(Math.max(scrollX + options.gutter, leftFromSource), maxLeft);
-  return { top, left, maxWidth };
+  return {
+    top: scrollY + options.gutter,
+    left: scrollX + Math.max(options.gutter, viewportWidth - maxWidth - options.gutter),
+    maxWidth
+  };
 }
 function getRole(item) {
   return item.role ?? (item.variant === "error" || item.variant === "warning" ? "alert" : "status");
@@ -191,72 +163,143 @@ function getDetailMessages(item) {
   }
   return details;
 }
+function QuotermItem({
+  item,
+  theme,
+  maxWidth,
+  renderIcon,
+  formatCommand
+}) {
+  const command = formatCommand(item.variant, item);
+  const icon = renderIcon?.(item.variant) ?? defaultIcons[item.variant];
+  const primary = getPrimaryMessage(item);
+  const details = getDetailMessages(item);
+  return /* @__PURE__ */ jsx(
+    "section",
+    {
+      role: getRole(item),
+      "aria-live": getAriaLive(item),
+      "aria-atomic": "true",
+      "data-quoterm": "item",
+      "data-variant": item.variant,
+      "data-theme": theme,
+      className: ["quoterm", `quoterm--${item.variant}`, item.className].filter(Boolean).join(" "),
+      style: { ...item.style, maxWidth },
+      children: /* @__PURE__ */ jsxs("div", { className: "quoterm__row", children: [
+        /* @__PURE__ */ jsx("span", { className: "quoterm__icon", "aria-hidden": "true", children: icon }),
+        /* @__PURE__ */ jsxs("div", { className: "quoterm__body", children: [
+          command ? /* @__PURE__ */ jsxs("div", { className: "quoterm__command", children: [
+            "$ ",
+            command
+          ] }) : null,
+          /* @__PURE__ */ jsxs("div", { className: "quoterm__quote", children: [
+            /* @__PURE__ */ jsx("span", { "aria-hidden": "true", children: "> " }),
+            /* @__PURE__ */ jsxs("span", { className: "quoterm__variant", children: [
+              item.variant,
+              ": "
+            ] }),
+            primary
+          ] }),
+          details.map((detail, index) => /* @__PURE__ */ jsx("div", { className: "quoterm__detail", children: detail }, index))
+        ] }),
+        /* @__PURE__ */ jsx(
+          "button",
+          {
+            type: "button",
+            className: "quoterm__dismiss",
+            "aria-label": item.dismissLabel ?? "Dismiss feedback",
+            onClick: () => dismissQuoterm(item.id),
+            children: "\xD7"
+          }
+        )
+      ] })
+    }
+  );
+}
+function InlineQuotermPortal({
+  item,
+  theme,
+  maxWidth,
+  renderIcon,
+  formatCommand
+}) {
+  const [container] = React.useState(() => typeof document === "undefined" ? null : document.createElement("div"));
+  React.useLayoutEffect(() => {
+    if (!container || !item.sourceElement?.parentNode) return;
+    container.className = "quoterm-inline-slot";
+    container.dataset.quoterm = "inline-slot";
+    container.dataset.quotermSlot = "inline";
+    item.sourceElement.parentNode.insertBefore(container, item.sourceElement);
+    return () => {
+      container.remove();
+    };
+  }, [container, item.sourceElement]);
+  if (!container) return null;
+  return createPortal(
+    /* @__PURE__ */ jsx(QuotermItem, { item, theme, maxWidth, renderIcon, formatCommand }),
+    container
+  );
+}
+function FallbackQuotermPortal({
+  item,
+  theme,
+  gutter,
+  maxWidth,
+  zIndex,
+  portalTarget,
+  renderIcon,
+  formatCommand
+}) {
+  if (typeof document === "undefined") return null;
+  const target = portalTarget ?? document.body;
+  const position = getDocumentPosition(item, { gutter, maxWidth });
+  return createPortal(
+    /* @__PURE__ */ jsx("div", { className: "quoterm-fallback-root", "data-quoterm": "fallback-slot", style: { top: position.top, left: position.left, zIndex }, children: /* @__PURE__ */ jsx(QuotermItem, { item, theme, maxWidth: position.maxWidth, renderIcon, formatCommand }) }),
+    target
+  );
+}
 function QuotermHost({
   className,
   maxItems = DEFAULT_MAX_ITEMS,
   gutter = DEFAULT_GUTTER,
   maxWidth = DEFAULT_MAX_WIDTH,
   zIndex = 1e3,
+  theme = "auto",
   portalTarget,
   renderIcon,
   formatCommand = defaultFormatCommand
 }) {
   const { items } = useQuoterm();
   const visibleItems = items.slice(0, Math.max(1, maxItems));
-  useViewportTick(visibleItems.length > 0);
   if (typeof document === "undefined" || visibleItems.length === 0) return null;
-  const target = portalTarget ?? document.body;
-  return createPortal(
-    /* @__PURE__ */ jsx("div", { className: ["quoterm-root", className].filter(Boolean).join(" "), style: { zIndex }, children: visibleItems.map((item) => {
-      const position = getDocumentPosition(item, { gutter, maxWidth });
-      const command = formatCommand(item.variant, item);
-      const icon = renderIcon?.(item.variant) ?? defaultIcons[item.variant];
-      const primary = getPrimaryMessage(item);
-      const details = getDetailMessages(item);
-      return /* @__PURE__ */ jsx(
-        "section",
-        {
-          role: getRole(item),
-          "aria-live": getAriaLive(item),
-          "aria-atomic": "true",
-          "data-quoterm": "item",
-          "data-variant": item.variant,
-          className: ["quoterm", `quoterm--${item.variant}`, item.className].filter(Boolean).join(" "),
-          style: { ...item.style, top: position.top, left: position.left, maxWidth: position.maxWidth },
-          children: /* @__PURE__ */ jsxs("div", { className: "quoterm__row", children: [
-            /* @__PURE__ */ jsx("span", { className: "quoterm__icon", "aria-hidden": "true", children: icon }),
-            /* @__PURE__ */ jsxs("div", { className: "quoterm__body", children: [
-              command ? /* @__PURE__ */ jsxs("div", { className: "quoterm__command", children: [
-                "$ ",
-                command
-              ] }) : null,
-              /* @__PURE__ */ jsxs("div", { className: "quoterm__quote", children: [
-                /* @__PURE__ */ jsx("span", { "aria-hidden": "true", children: "> " }),
-                /* @__PURE__ */ jsxs("span", { className: "quoterm__variant", children: [
-                  item.variant,
-                  ": "
-                ] }),
-                primary
-              ] }),
-              details.map((detail, index) => /* @__PURE__ */ jsx("div", { className: "quoterm__detail", children: detail }, index))
-            ] }),
-            /* @__PURE__ */ jsx(
-              "button",
-              {
-                type: "button",
-                className: "quoterm__dismiss",
-                "aria-label": item.dismissLabel ?? "Dismiss feedback",
-                onClick: () => dismissQuoterm(item.id),
-                children: "\xD7"
-              }
-            )
-          ] })
-        },
-        item.id
-      );
-    }) }),
-    target
-  );
+  return /* @__PURE__ */ jsx(Fragment, { children: visibleItems.map((item) => {
+    const itemTheme = item.theme ?? theme;
+    const content = item.sourceElement ? /* @__PURE__ */ jsx(
+      InlineQuotermPortal,
+      {
+        item,
+        theme: itemTheme,
+        maxWidth,
+        renderIcon,
+        formatCommand
+      },
+      item.id
+    ) : /* @__PURE__ */ jsx(
+      FallbackQuotermPortal,
+      {
+        item,
+        theme: itemTheme,
+        gutter,
+        maxWidth,
+        zIndex,
+        portalTarget,
+        renderIcon,
+        formatCommand
+      },
+      item.id
+    );
+    return className ? /* @__PURE__ */ jsx("div", { className, children: content }) : content;
+  }) });
 }
 export {
   QuotermHost,

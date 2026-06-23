@@ -7,7 +7,7 @@
 
 Quoted terminal-style inline feedback for React — a compact alternative to detached toast popups.
 
-Quoterm is for messages that should stay near the thing they explain: CLI-style command results, form feedback, generated citations, background task status, import warnings, and other “this happened here” UI moments. Toasts float away from context; Quoterm renders a small `> variant: message` quote beside the source.
+Quoterm is for messages that should stay near the thing they explain: CLI-style command results, form feedback, generated citations, background task status, import warnings, and other “this happened here” UI moments. Toasts float away from context; with a `source` element, Quoterm inserts a real inline DOM quote immediately before that source in normal document flow.
 
 > Status: public package skeleton is ready, but **not published to npm yet**. Do not rely on `npm install quoterm` until the first release is explicitly published.
 
@@ -66,11 +66,11 @@ export function App() {
 
 Final screenshots/GIFs are not included yet. These placeholders mark the exact media the project should capture before or shortly after the first public release; they are intentionally not fabricated.
 
-### Anchored near the clicked control
+### Inserted above the clicked control
 
-> **Media slot:** Screenshot/GIF showing a user clicking a button and a compact Quoterm line (`> success: Saved`) appearing above or beside that same control.
+> **Media slot:** Screenshot/GIF showing a user clicking a button and a compact Quoterm line (`> success: Saved`) inserted immediately above that same control in normal page flow.
 >
-> Suggested filename: `docs/media/quoterm-anchored-control.gif`
+> Suggested filename: `docs/media/quoterm-inline-control.gif`
 
 ### Success, warning, and error variants
 
@@ -84,7 +84,7 @@ Final screenshots/GIFs are not included yet. These placeholders mark the exact m
 >
 > Suggested filename: `docs/media/quoterm-vs-toast.gif`
 
-A runnable comparison app lives in [`examples/comparison`](examples/comparison/README.md). It is a plain light-mode page with one interactive example each for success, warning, error, and info. Each Quoterm result appears beside the clicked control as a compact inline quote (`> severity: message`) with a left border; optional toast-library buttons remain only as a lightweight comparison.
+A runnable comparison app lives in [`examples/comparison`](examples/comparison/README.md). It is a plain light-mode page with one interactive example each for success, warning, error, and info. Each Quoterm result is inserted above the clicked control as a compact inline quote (`> severity: message`) with a left border; there are no toast comparison controls in the primary rows, so the Quoterm behavior is unambiguous.
 
 Run it separately from the package root:
 
@@ -95,7 +95,7 @@ npm install
 npm run dev
 ```
 
-The example app intentionally carries its own demo dependencies. Installing or publishing the `quoterm` package remains lightweight; toast/demo dependencies must not be added to the root package runtime or peer dependencies.
+The example app intentionally stays lightweight. Installing or publishing the `quoterm` package remains limited to React peer dependencies; demo-only dependencies must not be added to the root package runtime or peer dependencies.
 
 ## API
 
@@ -106,6 +106,7 @@ Creates or replaces a feedback item and returns controls for that item.
 ```ts
 type QuotermVariant = 'success' | 'warning' | 'error' | 'info';
 type QuotermPlacement = 'auto' | 'top' | 'bottom';
+type QuotermTheme = 'light' | 'dark' | 'auto';
 type QuotermSource = EventTarget | Element | React.RefObject<Element | null> | DOMRect | null;
 
 interface QuotermInput {
@@ -114,6 +115,8 @@ interface QuotermInput {
   message?: React.ReactNode;
   description?: React.ReactNode;
   variant?: QuotermVariant;
+  /** Overrides the host theme for this item. */
+  theme?: QuotermTheme;
   command?: string;
   source?: QuotermSource;
   sourceRect?: DOMRect | null;
@@ -130,7 +133,7 @@ interface QuotermInput {
 
 ### `QuotermHost(props)`
 
-Renders active feedback in a portal as document-positioned inline quotes. Add one host per app or per bounded surface.
+Renders active feedback. When an item has a source element, the host creates a small inline slot immediately before that element and portals the quote into that slot, so it participates in normal document flow. Add one host per app or per bounded surface.
 
 ```ts
 interface QuotermHostProps {
@@ -139,6 +142,8 @@ interface QuotermHostProps {
   gutter?: number;
   maxWidth?: number;
   zIndex?: number;
+  /** Defaults to 'auto', following prefers-color-scheme. */
+  theme?: QuotermTheme;
   portalTarget?: Element | DocumentFragment | null;
   renderIcon?: (variant: QuotermVariant) => React.ReactNode;
   formatCommand?: (variant: QuotermVariant, item: QuotermState) => string;
@@ -163,18 +168,17 @@ Warnings and errors default to `role="alert"` and assertive announcements. Succe
 
 ## Anchoring and fallback placement
 
-Pass `source`, `sourceRect`, or a React ref to anchor feedback to the UI element that caused it.
+Pass `source` or a React ref to insert feedback immediately before the UI element that caused it. `sourceRect` is accepted for fallback-only cases where no element exists.
 
 ```tsx
 quoterm({
   source: buttonRef,
-  placement: 'auto',
   command: 'npm run build',
   title: '2 warnings, 0 errors',
 });
 ```
 
-Quoterm keeps live element references when possible and recalculates document coordinates on scroll/resize, so feedback moves with the page instead of detaching from the control. If no source is available, it falls back to a stable document position near the upper right of the current viewport. It does not manage global product semantics for you: render the host for the surface that owns the feedback.
+Quoterm keeps live element references when possible and inserts a small DOM slot immediately before the source element, so feedback scrolls naturally in document flow instead of behaving like a detached overlay, tooltip, or popover. If no source element is available, it falls back to a minimal fixed quote near the upper right of the viewport. Source-bound inline insertion is the primary mode.
 
 ## Dismissal and duration
 
@@ -191,7 +195,9 @@ dismissQuoterm(); // dismiss all
 
 `duration` is intentionally explicit: positive numbers auto-dismiss after that many milliseconds; `undefined`, `null`, and `0` keep the quote persistent until the close button or returned `dismiss()` handler is used. Persistent inline feedback is usually better for errors and warnings; short success confirmations often work well with a positive duration.
 
-## Styling customization
+## Themes and styling customization
+
+`QuotermHost` accepts `theme="auto" | "light" | "dark"`. The default is `auto`, which follows `prefers-color-scheme`; pass `theme="light"` for demos or product surfaces that should stay light. Individual calls can override the host with `quoterm({ theme: 'dark', ... })`. Severity accents stay vivid in both light and dark themes.
 
 Import the default stylesheet:
 
@@ -203,10 +209,9 @@ Then override classes or CSS variables:
 
 ```css
 .my-feedback {
-  --quoterm-bg: #111827;
-  --quoterm-fg: #f9fafb;
-  --quoterm-muted: #a78bfa;
-  --quoterm-border: rgb(167 139 250 / 0.65);
+  --quoterm-fg: #111827;
+  --quoterm-muted: #7c3aed;
+  --quoterm-border: #8b5cf6;
 }
 ```
 
@@ -222,7 +227,7 @@ The package marks CSS as a side effect so bundlers do not accidentally tree-shak
 - `warning` and `error` default to `role="alert"` and `aria-live="assertive"`.
 - Dismiss buttons include a configurable accessible label.
 - `aria-atomic="true"` is applied to each feedback item.
-- Feedback is visually associated with its source and follows document scrolling, preserving context better than detached global toasts.
+- Source-bound feedback is inserted immediately before its source in document flow, preserving context better than detached global toasts.
 - Keep message text concise and actionable; do not use Quoterm for long logs.
 
 ## Why not a toast?
