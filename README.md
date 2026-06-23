@@ -62,6 +62,30 @@ export function App() {
 }
 ```
 
+## Visual examples
+
+Final screenshots/GIFs are not included yet. These placeholders mark the exact media the project should capture before or shortly after the first public release; they are intentionally not fabricated.
+
+### Anchored near the clicked control
+
+> **Media slot:** Screenshot/GIF showing a user clicking a button and a Quoterm message appearing beside that same control.
+>
+> Suggested filename: `docs/media/quoterm-anchored-control.gif`
+
+### Success, warning, and error variants
+
+> **Media slot:** Screenshot showing the default `success`, `warning`, and `error` variants together, with readable contrast and visible dismiss controls.
+>
+> Suggested filename: `docs/media/quoterm-variants.png`
+
+### Quoterm versus a traditional corner toast
+
+> **Media slot:** Side-by-side screenshot/GIF contrasting contextual Quoterm feedback near the source with a detached lower-corner toast.
+>
+> Suggested filename: `docs/media/quoterm-vs-toast.gif`
+
+A lightweight capture sketch lives in [`examples/basic`](examples/basic/README.md). It documents a small demo app with anchored controls, success/warning/error states, and a traditional toast mock for comparison.
+
 ## API
 
 ### `quoterm(input)`
@@ -199,6 +223,14 @@ Use a toast when the message is global, disposable, and unrelated to the current
 - `exports` exposes the root module, `style.css`, `styles.css`, and `package.json`.
 - `files` publishes only `dist`, `README.md`, and `LICENSE`.
 - `sideEffects` preserves CSS imports while keeping JS tree-shakeable.
+
+## Contributing and issue reports
+
+- Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for local setup, development commands, PR expectations, accessibility expectations, and release notes.
+- Report reproducible bugs with the [bug report template](https://github.com/commrelayunit/quoterm/issues/new?template=bug_report.md).
+- Suggest API, UX, styling, or accessibility improvements with the [feature request template](https://github.com/commrelayunit/quoterm/issues/new?template=feature_request.md).
+
+Please include screenshots or GIFs for visual, placement, animation, or contrast issues when possible.
 
 ## Publishing checklist
 
