@@ -13,7 +13,7 @@ export interface QuotermInput {
   command?: string;
   source?: QuotermSource;
   sourceRect?: DOMRect | null;
-  duration?: number;
+  duration?: number | null;
   className?: string;
   style?: React.CSSProperties;
   dismissLabel?: string;
@@ -28,6 +28,7 @@ export interface QuotermState extends Omit<QuotermInput, "source"> {
   open: boolean;
   createdAt: number;
   sourceRect: DOMRect | null;
+  sourceElement: Element | null;
   variant: QuotermVariant;
 }
 
@@ -56,10 +57,10 @@ export interface QuotermHostProps {
 
 type Listener = () => void;
 
-const DEFAULT_DURATION = 6500;
 const DEFAULT_MAX_ITEMS = 3;
 const DEFAULT_MAX_WIDTH = 360;
 const DEFAULT_GUTTER = 16;
+const ESTIMATED_QUOTE_HEIGHT = 76;
 
 let nextId = 0;
 let snapshot: QuotermSnapshot = { items: [] };
@@ -104,19 +105,22 @@ function isDomRect(value: unknown): value is DOMRect {
   return typeof DOMRect !== "undefined" && value instanceof DOMRect;
 }
 
-function getSourceRect(source?: QuotermSource): DOMRect | null {
+function getSourceElement(source?: QuotermSource): Element | null {
   if (source === null) return null;
   const candidate = source ?? (typeof document !== "undefined" ? document.activeElement : null);
 
-  if (!candidate) return null;
-  if (isDomRect(candidate)) return candidate;
-  if (isElement(candidate)) return candidate.getBoundingClientRect();
-  if (typeof candidate === "object" && "current" in candidate && isElement(candidate.current)) {
-    return candidate.current.getBoundingClientRect();
-  }
-  if (candidate instanceof EventTarget && isElement(candidate)) return candidate.getBoundingClientRect();
+  if (!candidate || isDomRect(candidate)) return null;
+  if (isElement(candidate)) return candidate;
+  if (typeof candidate === "object" && "current" in candidate && isElement(candidate.current)) return candidate.current;
+  if (candidate instanceof EventTarget && isElement(candidate)) return candidate;
 
   return null;
+}
+
+function getSourceRect(source?: QuotermSource): DOMRect | null {
+  if (source === null) return null;
+  if (isDomRect(source)) return source;
+  return getSourceElement(source)?.getBoundingClientRect() ?? null;
 }
 
 function clearTimer(id: string) {
@@ -125,10 +129,10 @@ function clearTimer(id: string) {
   timers.delete(id);
 }
 
-function scheduleDismiss(id: string, duration?: number) {
+function scheduleDismiss(id: string, duration?: number | null) {
   clearTimer(id);
   if (typeof window === "undefined") return;
-  if (duration === undefined || duration <= 0 || !Number.isFinite(duration)) return;
+  if (duration === undefined || duration === null || duration <= 0 || !Number.isFinite(duration)) return;
 
   timers.set(
     id,
@@ -140,13 +144,16 @@ function scheduleDismiss(id: string, duration?: number) {
 
 function normalizeItem(input: QuotermInput): QuotermState {
   const { source, sourceRect, ...rest } = input;
+  const sourceElement = getSourceElement(source);
+
   return {
     ...rest,
     id: input.id ?? genId(),
     variant: input.variant ?? "success",
     open: true,
     createdAt: Date.now(),
-    sourceRect: sourceRect ?? getSourceRect(source),
+    sourceElement,
+    sourceRect: sourceRect ?? sourceElement?.getBoundingClientRect() ?? getSourceRect(source),
   };
 }
 
@@ -170,14 +177,24 @@ export function quoterm(input: QuotermInput): QuotermApi {
   const limit = Math.max(1, DEFAULT_MAX_ITEMS);
 
   setSnapshot({ items: [item, ...snapshot.items.filter((existing) => existing.id !== item.id)].slice(0, limit) });
-  scheduleDismiss(item.id, input.duration ?? DEFAULT_DURATION);
+  scheduleDismiss(item.id, input.duration);
 
   return {
     id: item.id,
     dismiss: () => dismissQuoterm(item.id),
     update: (patch) => {
-      const nextItem = { ...item, ...patch, sourceRect: patch.sourceRect ?? getSourceRect(patch.source) ?? item.sourceRect };
-      setSnapshot({ items: snapshot.items.map((existing) => (existing.id === item.id ? nextItem : existing)) });
+      const patchSourceElement = patch.source === undefined ? undefined : getSourceElement(patch.source);
+      const nextItems = snapshot.items.map((existing) => {
+        if (existing.id !== item.id) return existing;
+        const sourceElement = patchSourceElement !== undefined ? patchSourceElement : existing.sourceElement;
+        return {
+          ...existing,
+          ...patch,
+          sourceElement,
+          sourceRect: patch.sourceRect ?? sourceElement?.getBoundingClientRect() ?? existing.sourceRect,
+        };
+      });
+      setSnapshot({ items: nextItems });
       if (patch.duration !== undefined) scheduleDismiss(item.id, patch.duration);
     },
   };
@@ -210,24 +227,34 @@ function useViewportTick(active: boolean) {
   }, [active]);
 }
 
-function getPosition(item: QuotermState, options: Required<Pick<QuotermHostProps, "gutter" | "maxWidth">>) {
-  if (typeof window === "undefined") return { top: options.gutter, left: options.gutter };
+function getDocumentPosition(item: QuotermState, options: Required<Pick<QuotermHostProps, "gutter" | "maxWidth">>) {
+  if (typeof window === "undefined") return { top: options.gutter, left: options.gutter, maxWidth: options.maxWidth };
 
-  const width = Math.min(options.maxWidth, window.innerWidth - options.gutter * 2);
-  const fallbackTop = Math.max(options.gutter, window.innerHeight - 150);
-  const fallbackLeft = Math.max(options.gutter, window.innerWidth - width - options.gutter);
+  const viewportWidth = window.innerWidth || options.maxWidth + options.gutter * 2;
+  const maxWidth = Math.min(options.maxWidth, viewportWidth - options.gutter * 2);
+  const sourceRect = item.sourceElement?.getBoundingClientRect() ?? item.sourceRect;
+  const scrollX = window.scrollX || window.pageXOffset || 0;
+  const scrollY = window.scrollY || window.pageYOffset || 0;
 
-  if (!item.sourceRect) return { top: fallbackTop, left: fallbackLeft };
+  if (!sourceRect) {
+    return {
+      top: scrollY + options.gutter,
+      left: scrollX + Math.max(options.gutter, viewportWidth - maxWidth - options.gutter),
+      maxWidth,
+    };
+  }
 
-  const belowTop = item.sourceRect.bottom + 10;
-  const aboveTop = item.sourceRect.top - 106;
-  const canFitBelow = belowTop + 106 < window.innerHeight - options.gutter;
+  const gap = 8;
+  const topAbove = scrollY + sourceRect.top - ESTIMATED_QUOTE_HEIGHT - gap;
+  const topBelow = scrollY + sourceRect.bottom + gap;
+  const canFitAbove = sourceRect.top - ESTIMATED_QUOTE_HEIGHT - gap > options.gutter;
   const placement = item.placement ?? "auto";
-  const top = placement === "bottom" || (placement === "auto" && canFitBelow) ? belowTop : Math.max(options.gutter, aboveTop);
-  const centeredLeft = item.sourceRect.left + item.sourceRect.width / 2 - width / 2;
-  const left = Math.min(Math.max(options.gutter, centeredLeft), window.innerWidth - width - options.gutter);
+  const top = placement === "bottom" || (placement === "auto" && !canFitAbove) ? topBelow : Math.max(scrollY + options.gutter, topAbove);
+  const leftFromSource = scrollX + sourceRect.left;
+  const maxLeft = scrollX + viewportWidth - maxWidth - options.gutter;
+  const left = Math.min(Math.max(scrollX + options.gutter, leftFromSource), maxLeft);
 
-  return { top, left };
+  return { top, left, maxWidth };
 }
 
 function getRole(item: QuotermState) {
@@ -238,8 +265,23 @@ function getAriaLive(item: QuotermState) {
   return item.ariaLive ?? (item.variant === "error" || item.variant === "warning" ? "assertive" : "polite");
 }
 
-function defaultFormatCommand(variant: QuotermVariant, item: QuotermState) {
-  return item.command ?? `quoterm --${variant}`;
+function defaultFormatCommand(_variant: QuotermVariant, item: QuotermState) {
+  return item.command ?? "";
+}
+
+function getPrimaryMessage(item: QuotermState) {
+  return item.title ?? item.message ?? item.description ?? "";
+}
+
+function getDetailMessages(item: QuotermState) {
+  const details: React.ReactNode[] = [];
+  if (item.title) {
+    if (item.message) details.push(item.message);
+    if (item.description) details.push(item.description);
+  } else if (item.message && item.description) {
+    details.push(item.description);
+  }
+  return details;
 }
 
 export function QuotermHost({
@@ -263,9 +305,11 @@ export function QuotermHost({
   return createPortal(
     <div className={["quoterm-root", className].filter(Boolean).join(" ")} style={{ zIndex }}>
       {visibleItems.map((item) => {
-        const position = getPosition(item, { gutter, maxWidth });
+        const position = getDocumentPosition(item, { gutter, maxWidth });
         const command = formatCommand(item.variant, item);
         const icon = renderIcon?.(item.variant) ?? defaultIcons[item.variant];
+        const primary = getPrimaryMessage(item);
+        const details = getDetailMessages(item);
 
         return (
           <section
@@ -276,21 +320,24 @@ export function QuotermHost({
             data-quoterm="item"
             data-variant={item.variant}
             className={["quoterm", `quoterm--${item.variant}`, item.className].filter(Boolean).join(" ")}
-            style={{ ...item.style, top: position.top, left: position.left, maxWidth }}
+            style={{ ...item.style, top: position.top, left: position.left, maxWidth: position.maxWidth }}
           >
             <div className="quoterm__row">
               <span className="quoterm__icon" aria-hidden="true">
                 {icon}
               </span>
               <div className="quoterm__body">
-                <div className="quoterm__command">
-                  <span aria-hidden="true">$ {command}</span>
-                  <span className="quoterm__sr-only">{item.variant}: </span>
+                {command ? <div className="quoterm__command">$ {command}</div> : null}
+                <div className="quoterm__quote">
+                  <span aria-hidden="true">&gt; </span>
+                  <span className="quoterm__variant">{item.variant}: </span>
+                  {primary}
                 </div>
-                {item.title ? <div className="quoterm__title">{item.title}</div> : null}
-                {item.message ?? item.description ? (
-                  <div className="quoterm__message">{item.message ?? item.description}</div>
-                ) : null}
+                {details.map((detail, index) => (
+                  <div className="quoterm__detail" key={index}>
+                    {detail}
+                  </div>
+                ))}
               </div>
               <button
                 type="button"
