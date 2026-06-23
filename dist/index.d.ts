@@ -11,7 +11,7 @@ interface QuotermInput {
     command?: string;
     source?: QuotermSource;
     sourceRect?: DOMRect | null;
-    duration?: number;
+    duration?: number | null;
     className?: string;
     style?: React.CSSProperties;
     dismissLabel?: string;
@@ -25,6 +25,7 @@ interface QuotermState extends Omit<QuotermInput, "source"> {
     open: boolean;
     createdAt: number;
     sourceRect: DOMRect | null;
+    sourceElement: Element | null;
     variant: QuotermVariant;
 }
 interface QuotermSnapshot {

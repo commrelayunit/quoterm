@@ -1,6 +1,6 @@
 # Quoterm comparison example
 
-Runnable Vite app for comparing Quoterm against common React toast libraries.
+Minimal Vite app for checking Quoterm's inline quote behavior.
 
 This example intentionally has its own dependencies. The root `quoterm` package stays lean: React/React DOM remain the only peer dependencies, and toast/demo libraries live only in this example app.
 
@@ -26,30 +26,22 @@ npm run build
 
 ## What it demonstrates
 
-The app includes scenarios for:
+The page is intentionally plain light-mode UI. It includes one interactive Quoterm example for each variant:
 
-- Success feedback
-- Warning feedback
-- Error feedback
-- Async operation progress/update
-- Form validation feedback
-- Destructive action feedback
+- Success
+- Warning
+- Error
+- Info
 
-Each scenario can trigger:
+Each Quoterm result appears beside the clicked control as a compact quote line:
 
-- Quoterm anchored beside the clicked control
-- `react-hot-toast`
-- `sonner`
-- `react-toastify`
-- All libraries at once for side-by-side screenshot/GIF capture
+```text
+> severity: message
+```
 
-## Capture points
+Success and info examples use `duration: 5000` and auto-dismiss. Warning and error examples use `duration: 0` and persist until the close button is pressed. Scroll the page after triggering a quote to confirm it remains visually associated with its control.
 
-Suggested README media:
-
-- `docs/media/quoterm-anchored-control.gif` — click a “Quoterm near control” button.
-- `docs/media/quoterm-variants.png` — trigger Success, Warning, and Error with Quoterm.
-- `docs/media/quoterm-vs-toast.gif` — click “Compare all” to show contextual Quoterm versus detached toasts.
+A secondary button can trigger common toast libraries for a lightweight comparison, but the page prioritizes the corrected Quoterm behavior.
 
 ## Dependency boundary
 

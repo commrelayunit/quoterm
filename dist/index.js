@@ -2,10 +2,10 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { jsx, jsxs } from "react/jsx-runtime";
-var DEFAULT_DURATION = 6500;
 var DEFAULT_MAX_ITEMS = 3;
 var DEFAULT_MAX_WIDTH = 360;
 var DEFAULT_GUTTER = 16;
+var ESTIMATED_QUOTE_HEIGHT = 76;
 var nextId = 0;
 var snapshot = { items: [] };
 var listeners = /* @__PURE__ */ new Set();
@@ -40,17 +40,19 @@ function isElement(value) {
 function isDomRect(value) {
   return typeof DOMRect !== "undefined" && value instanceof DOMRect;
 }
-function getSourceRect(source) {
+function getSourceElement(source) {
   if (source === null) return null;
   const candidate = source ?? (typeof document !== "undefined" ? document.activeElement : null);
-  if (!candidate) return null;
-  if (isDomRect(candidate)) return candidate;
-  if (isElement(candidate)) return candidate.getBoundingClientRect();
-  if (typeof candidate === "object" && "current" in candidate && isElement(candidate.current)) {
-    return candidate.current.getBoundingClientRect();
-  }
-  if (candidate instanceof EventTarget && isElement(candidate)) return candidate.getBoundingClientRect();
+  if (!candidate || isDomRect(candidate)) return null;
+  if (isElement(candidate)) return candidate;
+  if (typeof candidate === "object" && "current" in candidate && isElement(candidate.current)) return candidate.current;
+  if (candidate instanceof EventTarget && isElement(candidate)) return candidate;
   return null;
+}
+function getSourceRect(source) {
+  if (source === null) return null;
+  if (isDomRect(source)) return source;
+  return getSourceElement(source)?.getBoundingClientRect() ?? null;
 }
 function clearTimer(id) {
   const timer = timers.get(id);
@@ -60,7 +62,7 @@ function clearTimer(id) {
 function scheduleDismiss(id, duration) {
   clearTimer(id);
   if (typeof window === "undefined") return;
-  if (duration === void 0 || duration <= 0 || !Number.isFinite(duration)) return;
+  if (duration === void 0 || duration === null || duration <= 0 || !Number.isFinite(duration)) return;
   timers.set(
     id,
     window.setTimeout(() => {
@@ -70,13 +72,15 @@ function scheduleDismiss(id, duration) {
 }
 function normalizeItem(input) {
   const { source, sourceRect, ...rest } = input;
+  const sourceElement = getSourceElement(source);
   return {
     ...rest,
     id: input.id ?? genId(),
     variant: input.variant ?? "success",
     open: true,
     createdAt: Date.now(),
-    sourceRect: sourceRect ?? getSourceRect(source)
+    sourceElement,
+    sourceRect: sourceRect ?? sourceElement?.getBoundingClientRect() ?? getSourceRect(source)
   };
 }
 function getQuotermsSnapshot() {
@@ -95,13 +99,23 @@ function quoterm(input) {
   const item = normalizeItem(input);
   const limit = Math.max(1, DEFAULT_MAX_ITEMS);
   setSnapshot({ items: [item, ...snapshot.items.filter((existing) => existing.id !== item.id)].slice(0, limit) });
-  scheduleDismiss(item.id, input.duration ?? DEFAULT_DURATION);
+  scheduleDismiss(item.id, input.duration);
   return {
     id: item.id,
     dismiss: () => dismissQuoterm(item.id),
     update: (patch) => {
-      const nextItem = { ...item, ...patch, sourceRect: patch.sourceRect ?? getSourceRect(patch.source) ?? item.sourceRect };
-      setSnapshot({ items: snapshot.items.map((existing) => existing.id === item.id ? nextItem : existing) });
+      const patchSourceElement = patch.source === void 0 ? void 0 : getSourceElement(patch.source);
+      const nextItems = snapshot.items.map((existing) => {
+        if (existing.id !== item.id) return existing;
+        const sourceElement = patchSourceElement !== void 0 ? patchSourceElement : existing.sourceElement;
+        return {
+          ...existing,
+          ...patch,
+          sourceElement,
+          sourceRect: patch.sourceRect ?? sourceElement?.getBoundingClientRect() ?? existing.sourceRect
+        };
+      });
+      setSnapshot({ items: nextItems });
       if (patch.duration !== void 0) scheduleDismiss(item.id, patch.duration);
     }
   };
@@ -130,20 +144,30 @@ function useViewportTick(active) {
     };
   }, [active]);
 }
-function getPosition(item, options) {
-  if (typeof window === "undefined") return { top: options.gutter, left: options.gutter };
-  const width = Math.min(options.maxWidth, window.innerWidth - options.gutter * 2);
-  const fallbackTop = Math.max(options.gutter, window.innerHeight - 150);
-  const fallbackLeft = Math.max(options.gutter, window.innerWidth - width - options.gutter);
-  if (!item.sourceRect) return { top: fallbackTop, left: fallbackLeft };
-  const belowTop = item.sourceRect.bottom + 10;
-  const aboveTop = item.sourceRect.top - 106;
-  const canFitBelow = belowTop + 106 < window.innerHeight - options.gutter;
+function getDocumentPosition(item, options) {
+  if (typeof window === "undefined") return { top: options.gutter, left: options.gutter, maxWidth: options.maxWidth };
+  const viewportWidth = window.innerWidth || options.maxWidth + options.gutter * 2;
+  const maxWidth = Math.min(options.maxWidth, viewportWidth - options.gutter * 2);
+  const sourceRect = item.sourceElement?.getBoundingClientRect() ?? item.sourceRect;
+  const scrollX = window.scrollX || window.pageXOffset || 0;
+  const scrollY = window.scrollY || window.pageYOffset || 0;
+  if (!sourceRect) {
+    return {
+      top: scrollY + options.gutter,
+      left: scrollX + Math.max(options.gutter, viewportWidth - maxWidth - options.gutter),
+      maxWidth
+    };
+  }
+  const gap = 8;
+  const topAbove = scrollY + sourceRect.top - ESTIMATED_QUOTE_HEIGHT - gap;
+  const topBelow = scrollY + sourceRect.bottom + gap;
+  const canFitAbove = sourceRect.top - ESTIMATED_QUOTE_HEIGHT - gap > options.gutter;
   const placement = item.placement ?? "auto";
-  const top = placement === "bottom" || placement === "auto" && canFitBelow ? belowTop : Math.max(options.gutter, aboveTop);
-  const centeredLeft = item.sourceRect.left + item.sourceRect.width / 2 - width / 2;
-  const left = Math.min(Math.max(options.gutter, centeredLeft), window.innerWidth - width - options.gutter);
-  return { top, left };
+  const top = placement === "bottom" || placement === "auto" && !canFitAbove ? topBelow : Math.max(scrollY + options.gutter, topAbove);
+  const leftFromSource = scrollX + sourceRect.left;
+  const maxLeft = scrollX + viewportWidth - maxWidth - options.gutter;
+  const left = Math.min(Math.max(scrollX + options.gutter, leftFromSource), maxLeft);
+  return { top, left, maxWidth };
 }
 function getRole(item) {
   return item.role ?? (item.variant === "error" || item.variant === "warning" ? "alert" : "status");
@@ -151,8 +175,21 @@ function getRole(item) {
 function getAriaLive(item) {
   return item.ariaLive ?? (item.variant === "error" || item.variant === "warning" ? "assertive" : "polite");
 }
-function defaultFormatCommand(variant, item) {
-  return item.command ?? `quoterm --${variant}`;
+function defaultFormatCommand(_variant, item) {
+  return item.command ?? "";
+}
+function getPrimaryMessage(item) {
+  return item.title ?? item.message ?? item.description ?? "";
+}
+function getDetailMessages(item) {
+  const details = [];
+  if (item.title) {
+    if (item.message) details.push(item.message);
+    if (item.description) details.push(item.description);
+  } else if (item.message && item.description) {
+    details.push(item.description);
+  }
+  return details;
 }
 function QuotermHost({
   className,
@@ -171,9 +208,11 @@ function QuotermHost({
   const target = portalTarget ?? document.body;
   return createPortal(
     /* @__PURE__ */ jsx("div", { className: ["quoterm-root", className].filter(Boolean).join(" "), style: { zIndex }, children: visibleItems.map((item) => {
-      const position = getPosition(item, { gutter, maxWidth });
+      const position = getDocumentPosition(item, { gutter, maxWidth });
       const command = formatCommand(item.variant, item);
       const icon = renderIcon?.(item.variant) ?? defaultIcons[item.variant];
+      const primary = getPrimaryMessage(item);
+      const details = getDetailMessages(item);
       return /* @__PURE__ */ jsx(
         "section",
         {
@@ -183,22 +222,23 @@ function QuotermHost({
           "data-quoterm": "item",
           "data-variant": item.variant,
           className: ["quoterm", `quoterm--${item.variant}`, item.className].filter(Boolean).join(" "),
-          style: { ...item.style, top: position.top, left: position.left, maxWidth },
+          style: { ...item.style, top: position.top, left: position.left, maxWidth: position.maxWidth },
           children: /* @__PURE__ */ jsxs("div", { className: "quoterm__row", children: [
             /* @__PURE__ */ jsx("span", { className: "quoterm__icon", "aria-hidden": "true", children: icon }),
             /* @__PURE__ */ jsxs("div", { className: "quoterm__body", children: [
-              /* @__PURE__ */ jsxs("div", { className: "quoterm__command", children: [
-                /* @__PURE__ */ jsxs("span", { "aria-hidden": "true", children: [
-                  "$ ",
-                  command
-                ] }),
-                /* @__PURE__ */ jsxs("span", { className: "quoterm__sr-only", children: [
+              command ? /* @__PURE__ */ jsxs("div", { className: "quoterm__command", children: [
+                "$ ",
+                command
+              ] }) : null,
+              /* @__PURE__ */ jsxs("div", { className: "quoterm__quote", children: [
+                /* @__PURE__ */ jsx("span", { "aria-hidden": "true", children: "> " }),
+                /* @__PURE__ */ jsxs("span", { className: "quoterm__variant", children: [
                   item.variant,
                   ": "
-                ] })
+                ] }),
+                primary
               ] }),
-              item.title ? /* @__PURE__ */ jsx("div", { className: "quoterm__title", children: item.title }) : null,
-              item.message ?? item.description ? /* @__PURE__ */ jsx("div", { className: "quoterm__message", children: item.message ?? item.description }) : null
+              details.map((detail, index) => /* @__PURE__ */ jsx("div", { className: "quoterm__detail", children: detail }, index))
             ] }),
             /* @__PURE__ */ jsx(
               "button",

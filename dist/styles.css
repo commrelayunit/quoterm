@@ -1,63 +1,50 @@
 .quoterm-root {
-  position: fixed;
-  inset: 0;
+  position: absolute;
+  inset: 0 auto auto 0;
   pointer-events: none;
 }
 
 .quoterm {
-  --quoterm-bg: rgba(8, 13, 23, 0.94);
+  --quoterm-bg: rgba(8, 13, 23, 0.96);
   --quoterm-fg: #ecfeff;
   --quoterm-muted: #a7f3d0;
-  --quoterm-border: rgba(52, 211, 153, 0.56);
-  --quoterm-shadow: rgba(2, 6, 23, 0.35);
+  --quoterm-border: rgba(52, 211, 153, 0.78);
+  --quoterm-shadow: rgba(2, 6, 23, 0.28);
 
-  position: fixed;
-  width: min(360px, calc(100vw - 2rem));
+  position: absolute;
   box-sizing: border-box;
+  width: max-content;
   pointer-events: auto;
-  border: 1px solid var(--quoterm-border);
-  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--quoterm-border), transparent 58%);
+  border-left: 4px solid var(--quoterm-border);
+  border-radius: 0.35rem;
   background: var(--quoterm-bg);
   color: var(--quoterm-fg);
-  box-shadow: 0 18px 50px var(--quoterm-shadow);
-  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px var(--quoterm-shadow);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 0.78rem;
   line-height: 1.35;
-  padding: 0.65rem 0.75rem;
-}
-
-.quoterm::before {
-  content: "";
-  position: absolute;
-  top: -5px;
-  left: 1.5rem;
-  width: 0.55rem;
-  height: 0.55rem;
-  transform: rotate(45deg);
-  border-left: 1px solid var(--quoterm-border);
-  border-top: 1px solid var(--quoterm-border);
-  background: var(--quoterm-bg);
+  padding: 0.55rem 0.65rem;
 }
 
 .quoterm--success {
   --quoterm-muted: #86efac;
-  --quoterm-border: rgba(52, 211, 153, 0.62);
+  --quoterm-border: rgba(52, 211, 153, 0.86);
 }
 
 .quoterm--warning {
   --quoterm-muted: #fdba74;
-  --quoterm-border: rgba(251, 146, 60, 0.72);
+  --quoterm-border: rgba(251, 146, 60, 0.9);
 }
 
 .quoterm--error {
   --quoterm-muted: #fca5a5;
-  --quoterm-border: rgba(248, 113, 113, 0.72);
+  --quoterm-border: rgba(248, 113, 113, 0.9);
 }
 
 .quoterm--info {
   --quoterm-muted: #7dd3fc;
-  --quoterm-border: rgba(56, 189, 248, 0.62);
+  --quoterm-border: rgba(56, 189, 248, 0.84);
 }
 
 .quoterm__row {
@@ -83,22 +70,26 @@
 }
 
 .quoterm__command {
-  color: var(--quoterm-muted);
-  font-size: 0.64rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+  margin-bottom: 0.18rem;
+  color: color-mix(in srgb, var(--quoterm-muted), white 8%);
+  font-size: 0.7rem;
+  opacity: 0.9;
+  overflow-wrap: anywhere;
 }
 
-.quoterm__title {
-  margin-top: 0.25rem;
+.quoterm__quote {
   overflow-wrap: anywhere;
   font-weight: 700;
 }
 
-.quoterm__message {
+.quoterm__variant {
+  color: var(--quoterm-muted);
+}
+
+.quoterm__detail {
   margin-top: 0.25rem;
   overflow-wrap: anywhere;
-  opacity: 0.9;
+  opacity: 0.88;
 }
 
 .quoterm__dismiss {
@@ -111,7 +102,7 @@
   cursor: pointer;
   font: inherit;
   line-height: 1;
-  opacity: 0.7;
+  opacity: 0.72;
   padding: 0.25rem;
 }
 

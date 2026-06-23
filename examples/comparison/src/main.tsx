@@ -9,215 +9,137 @@ import "react-toastify/dist/ReactToastify.css";
 import "./styles.css";
 
 type Variant = "success" | "warning" | "error" | "info";
-type Library = "quoterm" | "hot" | "sonner" | "toastify" | "all";
 
-interface Scenario {
-  id: string;
-  label: string;
+interface Example {
   variant: Variant;
-  command: string;
-  title: string;
+  label: string;
   message: string;
-  actionLabel: string;
+  button: string;
 }
 
-const scenarios: Scenario[] = [
+const examples: Example[] = [
   {
-    id: "success",
-    label: "Success",
     variant: "success",
-    command: "save settings",
-    title: "Settings saved",
-    message: "The new endpoint will be used on the next request.",
-    actionLabel: "Save settings",
+    label: "Success",
+    message: "settings saved",
+    button: "Save settings",
   },
   {
-    id: "warning",
+    variant: "warning",
     label: "Warning",
-    variant: "warning",
-    command: "sync library",
-    title: "Synced with warnings",
-    message: "2 imported records need a manual citation check.",
-    actionLabel: "Sync library",
+    message: "2 records need review",
+    button: "Sync library",
   },
   {
-    id: "error",
+    variant: "error",
     label: "Error",
-    variant: "error",
-    command: "publish package",
-    title: "Publish blocked",
-    message: "Run the prepack checks before shipping this release.",
-    actionLabel: "Publish package",
+    message: "prepack checks failed",
+    button: "Publish package",
   },
   {
-    id: "async",
-    label: "Async operation",
     variant: "info",
-    command: "index corpus",
-    title: "Indexing started",
-    message: "Quoterm can update in place; toasts usually stack progress elsewhere.",
-    actionLabel: "Index corpus",
-  },
-  {
-    id: "validation",
-    label: "Form validation",
-    variant: "warning",
-    command: "validate email",
-    title: "Email needs attention",
-    message: "Use a university address so reviewers can verify affiliation.",
-    actionLabel: "Validate form",
-  },
-  {
-    id: "destructive",
-    label: "Destructive action",
-    variant: "error",
-    command: "delete dataset",
-    title: "Deletion requires confirmation",
-    message: "Type the dataset slug before removing 418 cached rows.",
-    actionLabel: "Delete dataset",
+    label: "Info",
+    message: "indexing started",
+    button: "Index corpus",
   },
 ];
 
-const variantEmoji: Record<Variant, string> = {
-  success: "✅",
-  warning: "⚠️",
-  error: "🛑",
-  info: "ℹ️",
-};
+function showToastExample(example: Example) {
+  const text = `${example.label}: ${example.message}`;
 
-function showToastLibrary(library: Exclude<Library, "quoterm" | "all">, scenario: Scenario) {
-  const text = `${scenario.title}: ${scenario.message}`;
-
-  if (library === "hot") {
-    if (scenario.variant === "success") hotToast.success(text);
-    else if (scenario.variant === "error") hotToast.error(text);
-    else hotToast(text, { icon: variantEmoji[scenario.variant] });
-  }
-
-  if (library === "sonner") {
-    if (scenario.variant === "success") sonnerToast.success(scenario.title, { description: scenario.message });
-    else if (scenario.variant === "error") sonnerToast.error(scenario.title, { description: scenario.message });
-    else if (scenario.variant === "warning") sonnerToast.warning(scenario.title, { description: scenario.message });
-    else sonnerToast.info(scenario.title, { description: scenario.message });
-  }
-
-  if (library === "toastify") {
-    if (scenario.variant === "success") toastify.success(text);
-    else if (scenario.variant === "error") toastify.error(text);
-    else if (scenario.variant === "warning") toastify.warning(text);
-    else toastify.info(text);
-  }
-}
-
-function fireScenario(event: React.MouseEvent<HTMLButtonElement>, scenario: Scenario, library: Library) {
-  if (library === "quoterm" || library === "all") {
-    if (scenario.id === "async") {
-      const feedback = quoterm({
-        source: event.currentTarget,
-        variant: "info",
-        command: scenario.command,
-        title: "Indexing corpus",
-        message: "Queued worker…",
-        duration: 0,
-      });
-      window.setTimeout(() => feedback.update({ variant: "success", title: "Index complete", message: "1,284 chunks indexed." }), 1200);
-    } else {
-      quoterm({
-        source: event.currentTarget,
-        variant: scenario.variant,
-        command: scenario.command,
-        title: scenario.title,
-        message: scenario.message,
-        duration: 0,
-      });
-    }
-  }
-
-  if (library === "all") {
-    showToastLibrary("hot", scenario);
-    showToastLibrary("sonner", scenario);
-    showToastLibrary("toastify", scenario);
+  if (example.variant === "success") {
+    hotToast.success(text);
+    sonnerToast.success(example.label, { description: example.message });
+    toastify.success(text);
     return;
   }
 
-  if (library !== "quoterm") showToastLibrary(library, scenario);
+  if (example.variant === "error") {
+    hotToast.error(text);
+    sonnerToast.error(example.label, { description: example.message });
+    toastify.error(text);
+    return;
+  }
+
+  if (example.variant === "warning") {
+    hotToast(text, { icon: "!" });
+    sonnerToast.warning(example.label, { description: example.message });
+    toastify.warning(text);
+    return;
+  }
+
+  hotToast(text, { icon: "i" });
+  sonnerToast.info(example.label, { description: example.message });
+  toastify.info(text);
 }
 
-function ScenarioCard({ scenario }: { scenario: Scenario }) {
+function ExampleRow({ example }: { example: Example }) {
   return (
-    <article className="scenario-card">
+    <section className="example-row" aria-labelledby={`${example.variant}-heading`}>
       <div>
-        <p className="eyebrow">{scenario.label}</p>
-        <h2>{scenario.actionLabel}</h2>
-        <p>{scenario.message}</p>
+        <h2 id={`${example.variant}-heading`}>{example.label}</h2>
+        <p className="sample-line">&gt; {example.variant}: {example.message}</p>
       </div>
-      <div className="button-grid" aria-label={`${scenario.label} feedback triggers`}>
-        <button type="button" onClick={(event) => fireScenario(event, scenario, "quoterm")}>
-          Quoterm near control
+      <div className="actions">
+        <button
+          type="button"
+          onClick={(event) => {
+            quoterm({
+              source: event.currentTarget,
+              variant: example.variant,
+              message: example.message,
+              duration: example.variant === "success" || example.variant === "info" ? 5000 : 0,
+            });
+          }}
+        >
+          {example.button}
         </button>
-        <button type="button" onClick={(event) => fireScenario(event, scenario, "hot")}>
-          react-hot-toast
-        </button>
-        <button type="button" onClick={(event) => fireScenario(event, scenario, "sonner")}>
-          Sonner
-        </button>
-        <button type="button" onClick={(event) => fireScenario(event, scenario, "toastify")}>
-          React-Toastify
-        </button>
-        <button className="compare" type="button" onClick={(event) => fireScenario(event, scenario, "all")}>
-          Compare all
+        <button type="button" className="secondary" onClick={() => showToastExample(example)}>
+          Show toast comparison
         </button>
       </div>
-    </article>
+    </section>
   );
 }
 
 function App() {
   return (
     <main>
-      <section className="hero">
-        <p className="eyebrow">Interactive comparison app</p>
-        <h1>Quoterm keeps feedback where the action happened.</h1>
+      <header>
+        <h1>Quoterm inline quote examples</h1>
         <p>
-          Click any scenario to compare anchored Quoterm feedback against corner/global toasts from common React toast libraries.
-          Use the “Compare all” buttons for screenshot and GIF capture.
+          Click a control to show the quote beside it. Success and info quotes auto-fade after 5 seconds; warning and
+          error quotes persist until dismissed. Each Quoterm message uses the form:
         </p>
-        <div className="hero-actions">
+        <p className="sample-line">&gt; severity: message</p>
+        <div className="toolbar">
           <button type="button" onClick={() => dismissQuoterm()}>
-            Clear Quoterm feedback
+            Clear Quoterm
           </button>
           <button
             type="button"
+            className="secondary"
             onClick={() => {
               hotToast.dismiss();
               sonnerToast.dismiss();
               toastify.dismiss();
             }}
           >
-            Clear toast libraries
+            Clear toasts
           </button>
         </div>
-      </section>
+      </header>
 
-      <section className="capture-notes" aria-labelledby="capture-heading">
-        <h2 id="capture-heading">Capture points</h2>
-        <ul>
-          <li>Click “Quoterm near control” to capture contextual placement.</li>
-          <li>Click “Compare all” to capture Quoterm versus detached corner toasts.</li>
-          <li>Use Success, Warning, Error, Async, Validation, and Destructive scenarios for README media.</li>
-        </ul>
-      </section>
-
-      <section className="scenario-grid" aria-label="Feedback scenarios">
-        {scenarios.map((scenario) => (
-          <ScenarioCard key={scenario.id} scenario={scenario} />
+      <div className="examples">
+        {examples.map((example) => (
+          <ExampleRow key={example.variant} example={example} />
         ))}
-      </section>
+      </div>
 
-      <QuotermHost maxItems={6} />
+      <QuotermHost maxItems={4} />
       <HotToaster position="bottom-right" />
       <SonnerToaster position="top-right" richColors closeButton />
-      <ToastContainer position="bottom-left" newestOnTop theme="colored" />
+      <ToastContainer position="bottom-left" newestOnTop />
     </main>
   );
 }
