@@ -27,8 +27,10 @@ npm install github:commrelayunit/quoterm
 
 ```tsx
 import { QuotermHost, quoterm } from 'quoterm';
-import 'quoterm/styles.css';
+import 'quoterm/style.css';
 ```
+
+`quoterm/styles.css` is also exported as a compatibility alias.
 
 ## Quick start
 
@@ -36,7 +38,7 @@ Render one host near the root of your app, then trigger feedback from actions, c
 
 ```tsx
 import { QuotermHost, quoterm } from 'quoterm';
-import 'quoterm/styles.css';
+import 'quoterm/style.css';
 
 export function App() {
   return (
@@ -155,7 +157,7 @@ dismissQuoterm(); // dismiss all
 Import the default stylesheet:
 
 ```tsx
-import 'quoterm/styles.css';
+import 'quoterm/style.css';
 ```
 
 Then override classes or CSS variables:
