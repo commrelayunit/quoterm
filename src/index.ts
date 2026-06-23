@@ -13,6 +13,7 @@ export type {
   QuotermPlacement,
   QuotermSource,
   QuotermState,
+  QuotermTheme,
   QuotermVariant,
   QuotermSnapshot,
 } from "./quoterm";

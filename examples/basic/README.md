@@ -6,7 +6,7 @@ This folder documents a tiny example app that can be used later to capture READM
 
 Capture these states:
 
-1. Quoterm anchored near a clicked button/control.
+1. Quoterm inserted immediately above a clicked button/control.
 2. One clear light-mode interaction each for success, warning, error, and info.
 3. Compact quote text in the form `> severity: message`, including `> info: message` for the blue info variant.
 4. Positive `duration` auto-dismisses success/info examples; `duration: 0` keeps warning/error examples persistent until closed.
@@ -23,7 +23,7 @@ function Demo() {
   return (
     <main style={{ padding: 48 }}>
       <h1>Quoterm demo</h1>
-      <p>Click each control to show feedback anchored near the source.</p>
+      <p>Click each control to insert feedback immediately above that source.</p>
 
       {[
         ['success', 'Save settings', 'settings saved'],
@@ -46,7 +46,7 @@ function Demo() {
         </button>
       ))}
 
-      <QuotermHost />
+      <QuotermHost theme="light" />
     </main>
   );
 }

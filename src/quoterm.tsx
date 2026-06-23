@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 
 export type QuotermVariant = "success" | "warning" | "error" | "info";
 export type QuotermPlacement = "auto" | "top" | "bottom";
+export type QuotermTheme = "light" | "dark" | "auto";
 export type QuotermSource = EventTarget | Element | React.RefObject<Element | null> | DOMRect | null;
 
 export interface QuotermInput {
@@ -10,6 +11,7 @@ export interface QuotermInput {
   message?: React.ReactNode;
   description?: React.ReactNode;
   variant?: QuotermVariant;
+  theme?: QuotermTheme;
   command?: string;
   source?: QuotermSource;
   sourceRect?: DOMRect | null;
@@ -50,6 +52,7 @@ export interface QuotermHostProps {
   gutter?: number;
   maxWidth?: number;
   zIndex?: number;
+  theme?: QuotermTheme;
   portalTarget?: Element | DocumentFragment | null;
   renderIcon?: (variant: QuotermVariant) => React.ReactNode;
   formatCommand?: (variant: QuotermVariant, item: QuotermState) => string;
@@ -60,7 +63,6 @@ type Listener = () => void;
 const DEFAULT_MAX_ITEMS = 3;
 const DEFAULT_MAX_WIDTH = 360;
 const DEFAULT_GUTTER = 16;
-const ESTIMATED_QUOTE_HEIGHT = 76;
 
 let nextId = 0;
 let snapshot: QuotermSnapshot = { items: [] };
@@ -174,9 +176,7 @@ export function dismissQuoterm(id?: string) {
 
 export function quoterm(input: QuotermInput): QuotermApi {
   const item = normalizeItem(input);
-  const limit = Math.max(1, DEFAULT_MAX_ITEMS);
-
-  setSnapshot({ items: [item, ...snapshot.items.filter((existing) => existing.id !== item.id)].slice(0, limit) });
+  setSnapshot({ items: [item, ...snapshot.items.filter((existing) => existing.id !== item.id)] });
   scheduleDismiss(item.id, input.duration);
 
   return {
@@ -212,49 +212,19 @@ export function useQuoterm() {
   );
 }
 
-function useViewportTick(active: boolean) {
-  const [, setTick] = React.useState(0);
-
-  React.useEffect(() => {
-    if (!active || typeof window === "undefined") return;
-    const update = () => setTick((value) => value + 1);
-    window.addEventListener("resize", update);
-    window.addEventListener("scroll", update, true);
-    return () => {
-      window.removeEventListener("resize", update);
-      window.removeEventListener("scroll", update, true);
-    };
-  }, [active]);
-}
-
 function getDocumentPosition(item: QuotermState, options: Required<Pick<QuotermHostProps, "gutter" | "maxWidth">>) {
   if (typeof window === "undefined") return { top: options.gutter, left: options.gutter, maxWidth: options.maxWidth };
 
   const viewportWidth = window.innerWidth || options.maxWidth + options.gutter * 2;
   const maxWidth = Math.min(options.maxWidth, viewportWidth - options.gutter * 2);
-  const sourceRect = item.sourceElement?.getBoundingClientRect() ?? item.sourceRect;
   const scrollX = window.scrollX || window.pageXOffset || 0;
   const scrollY = window.scrollY || window.pageYOffset || 0;
 
-  if (!sourceRect) {
-    return {
-      top: scrollY + options.gutter,
-      left: scrollX + Math.max(options.gutter, viewportWidth - maxWidth - options.gutter),
-      maxWidth,
-    };
-  }
-
-  const gap = 8;
-  const topAbove = scrollY + sourceRect.top - ESTIMATED_QUOTE_HEIGHT - gap;
-  const topBelow = scrollY + sourceRect.bottom + gap;
-  const canFitAbove = sourceRect.top - ESTIMATED_QUOTE_HEIGHT - gap > options.gutter;
-  const placement = item.placement ?? "auto";
-  const top = placement === "bottom" || (placement === "auto" && !canFitAbove) ? topBelow : Math.max(scrollY + options.gutter, topAbove);
-  const leftFromSource = scrollX + sourceRect.left;
-  const maxLeft = scrollX + viewportWidth - maxWidth - options.gutter;
-  const left = Math.min(Math.max(scrollX + options.gutter, leftFromSource), maxLeft);
-
-  return { top, left, maxWidth };
+  return {
+    top: scrollY + options.gutter,
+    left: scrollX + Math.max(options.gutter, viewportWidth - maxWidth - options.gutter),
+    maxWidth,
+  };
 }
 
 function getRole(item: QuotermState) {
@@ -284,74 +254,178 @@ function getDetailMessages(item: QuotermState) {
   return details;
 }
 
+function QuotermItem({
+  item,
+  theme,
+  maxWidth,
+  renderIcon,
+  formatCommand,
+}: {
+  item: QuotermState;
+  theme: QuotermTheme;
+  maxWidth: number;
+  renderIcon: ((variant: QuotermVariant) => React.ReactNode) | undefined;
+  formatCommand: (variant: QuotermVariant, item: QuotermState) => string;
+}) {
+  const command = formatCommand(item.variant, item);
+  const icon = renderIcon?.(item.variant) ?? defaultIcons[item.variant];
+  const primary = getPrimaryMessage(item);
+  const details = getDetailMessages(item);
+
+  return (
+    <section
+      role={getRole(item)}
+      aria-live={getAriaLive(item)}
+      aria-atomic="true"
+      data-quoterm="item"
+      data-variant={item.variant}
+      data-theme={theme}
+      className={["quoterm", `quoterm--${item.variant}`, item.className].filter(Boolean).join(" ")}
+      style={{ ...item.style, maxWidth }}
+    >
+      <div className="quoterm__row">
+        <span className="quoterm__icon" aria-hidden="true">
+          {icon}
+        </span>
+        <div className="quoterm__body">
+          {command ? <div className="quoterm__command">$ {command}</div> : null}
+          <div className="quoterm__quote">
+            <span aria-hidden="true">&gt; </span>
+            <span className="quoterm__variant">{item.variant}: </span>
+            {primary}
+          </div>
+          {details.map((detail, index) => (
+            <div className="quoterm__detail" key={index}>
+              {detail}
+            </div>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="quoterm__dismiss"
+          aria-label={item.dismissLabel ?? "Dismiss feedback"}
+          onClick={() => dismissQuoterm(item.id)}
+        >
+          ×
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function InlineQuotermPortal({
+  item,
+  theme,
+  maxWidth,
+  renderIcon,
+  formatCommand,
+}: {
+  item: QuotermState;
+  theme: QuotermTheme;
+  maxWidth: number;
+  renderIcon: ((variant: QuotermVariant) => React.ReactNode) | undefined;
+  formatCommand: (variant: QuotermVariant, item: QuotermState) => string;
+}) {
+  const [container] = React.useState(() => (typeof document === "undefined" ? null : document.createElement("div")));
+
+  React.useLayoutEffect(() => {
+    if (!container || !item.sourceElement?.parentNode) return;
+
+    container.className = "quoterm-inline-slot";
+    container.dataset.quoterm = "inline-slot";
+    container.dataset.quotermSlot = "inline";
+    item.sourceElement.parentNode.insertBefore(container, item.sourceElement);
+
+    return () => {
+      container.remove();
+    };
+  }, [container, item.sourceElement]);
+
+  if (!container) return null;
+
+  return createPortal(
+    <QuotermItem item={item} theme={theme} maxWidth={maxWidth} renderIcon={renderIcon} formatCommand={formatCommand} />,
+    container,
+  );
+}
+
+function FallbackQuotermPortal({
+  item,
+  theme,
+  gutter,
+  maxWidth,
+  zIndex,
+  portalTarget,
+  renderIcon,
+  formatCommand,
+}: {
+  item: QuotermState;
+  theme: QuotermTheme;
+  gutter: number;
+  maxWidth: number;
+  zIndex: number;
+  portalTarget: Element | DocumentFragment | null | undefined;
+  renderIcon: ((variant: QuotermVariant) => React.ReactNode) | undefined;
+  formatCommand: (variant: QuotermVariant, item: QuotermState) => string;
+}) {
+  if (typeof document === "undefined") return null;
+
+  const target = portalTarget ?? document.body;
+  const position = getDocumentPosition(item, { gutter, maxWidth });
+
+  return createPortal(
+    <div className="quoterm-fallback-root" data-quoterm="fallback-slot" style={{ top: position.top, left: position.left, zIndex }}>
+      <QuotermItem item={item} theme={theme} maxWidth={position.maxWidth} renderIcon={renderIcon} formatCommand={formatCommand} />
+    </div>,
+    target,
+  );
+}
+
 export function QuotermHost({
   className,
   maxItems = DEFAULT_MAX_ITEMS,
   gutter = DEFAULT_GUTTER,
   maxWidth = DEFAULT_MAX_WIDTH,
   zIndex = 1000,
+  theme = "auto",
   portalTarget,
   renderIcon,
   formatCommand = defaultFormatCommand,
 }: QuotermHostProps) {
   const { items } = useQuoterm();
   const visibleItems = items.slice(0, Math.max(1, maxItems));
-  useViewportTick(visibleItems.length > 0);
 
   if (typeof document === "undefined" || visibleItems.length === 0) return null;
 
-  const target = portalTarget ?? document.body;
-
-  return createPortal(
-    <div className={["quoterm-root", className].filter(Boolean).join(" ")} style={{ zIndex }}>
+  return (
+    <>
       {visibleItems.map((item) => {
-        const position = getDocumentPosition(item, { gutter, maxWidth });
-        const command = formatCommand(item.variant, item);
-        const icon = renderIcon?.(item.variant) ?? defaultIcons[item.variant];
-        const primary = getPrimaryMessage(item);
-        const details = getDetailMessages(item);
-
-        return (
-          <section
+        const itemTheme = item.theme ?? theme;
+        const content = item.sourceElement ? (
+          <InlineQuotermPortal
             key={item.id}
-            role={getRole(item)}
-            aria-live={getAriaLive(item)}
-            aria-atomic="true"
-            data-quoterm="item"
-            data-variant={item.variant}
-            className={["quoterm", `quoterm--${item.variant}`, item.className].filter(Boolean).join(" ")}
-            style={{ ...item.style, top: position.top, left: position.left, maxWidth: position.maxWidth }}
-          >
-            <div className="quoterm__row">
-              <span className="quoterm__icon" aria-hidden="true">
-                {icon}
-              </span>
-              <div className="quoterm__body">
-                {command ? <div className="quoterm__command">$ {command}</div> : null}
-                <div className="quoterm__quote">
-                  <span aria-hidden="true">&gt; </span>
-                  <span className="quoterm__variant">{item.variant}: </span>
-                  {primary}
-                </div>
-                {details.map((detail, index) => (
-                  <div className="quoterm__detail" key={index}>
-                    {detail}
-                  </div>
-                ))}
-              </div>
-              <button
-                type="button"
-                className="quoterm__dismiss"
-                aria-label={item.dismissLabel ?? "Dismiss feedback"}
-                onClick={() => dismissQuoterm(item.id)}
-              >
-                ×
-              </button>
-            </div>
-          </section>
+            item={item}
+            theme={itemTheme}
+            maxWidth={maxWidth}
+            renderIcon={renderIcon}
+            formatCommand={formatCommand}
+          />
+        ) : (
+          <FallbackQuotermPortal
+            key={item.id}
+            item={item}
+            theme={itemTheme}
+            gutter={gutter}
+            maxWidth={maxWidth}
+            zIndex={zIndex}
+            portalTarget={portalTarget}
+            renderIcon={renderIcon}
+            formatCommand={formatCommand}
+          />
         );
+
+        return className ? <div className={className}>{content}</div> : content;
       })}
-    </div>,
-    target,
+    </>
   );
 }
