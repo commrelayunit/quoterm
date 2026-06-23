@@ -150,6 +150,9 @@ function getAriaLive(item) {
 function defaultFormatCommand(_variant, item) {
   return item.command ?? "";
 }
+function getInlinePlacement(placement) {
+  return placement === "bottom" || placement === "after" || placement === "below" ? "after" : "before";
+}
 function getPrimaryMessage(item) {
   return item.title ?? item.message ?? item.description ?? "";
 }
@@ -193,7 +196,10 @@ function QuotermItem({
             command
           ] }) : null,
           /* @__PURE__ */ jsxs("div", { className: "quoterm__quote", children: [
-            /* @__PURE__ */ jsx("span", { "aria-hidden": "true", children: "> " }),
+            /* @__PURE__ */ jsxs("span", { className: "quoterm__prompt", "aria-hidden": "true", children: [
+              ">",
+              " "
+            ] }),
             /* @__PURE__ */ jsxs("span", { className: "quoterm__variant", children: [
               item.variant,
               ": "
@@ -226,14 +232,20 @@ function InlineQuotermPortal({
   const [container] = React.useState(() => typeof document === "undefined" ? null : document.createElement("div"));
   React.useLayoutEffect(() => {
     if (!container || !item.sourceElement?.parentNode) return;
+    const inlinePlacement = getInlinePlacement(item.placement);
     container.className = "quoterm-inline-slot";
     container.dataset.quoterm = "inline-slot";
     container.dataset.quotermSlot = "inline";
-    item.sourceElement.parentNode.insertBefore(container, item.sourceElement);
+    container.dataset.quotermPlacement = inlinePlacement;
+    if (inlinePlacement === "after") {
+      item.sourceElement.parentNode.insertBefore(container, item.sourceElement.nextSibling);
+    } else {
+      item.sourceElement.parentNode.insertBefore(container, item.sourceElement);
+    }
     return () => {
       container.remove();
     };
-  }, [container, item.sourceElement]);
+  }, [container, item.placement, item.sourceElement]);
   if (!container) return null;
   return createPortal(
     /* @__PURE__ */ jsx(QuotermItem, { item, theme, maxWidth, renderIcon, formatCommand }),

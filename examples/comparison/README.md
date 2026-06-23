@@ -1,6 +1,6 @@
 # Quoterm comparison example
 
-Minimal Vite app for checking Quoterm's inline quote behavior.
+Minimal Vite playground for checking Quoterm's inline quote behavior.
 
 This example intentionally stays plain. The root `quoterm` package remains lean: React/React DOM are the only peer dependencies.
 
@@ -26,17 +26,17 @@ npm run build
 
 ## What it demonstrates
 
-The page is intentionally plain light-mode UI. It includes one interactive Quoterm example for each variant:
+The page is intentionally plain UI. It includes one interactive Quoterm example for each variant:
 
 - Success
 - Warning
 - Error
 - Info
 
-Each Quoterm result is inserted immediately above the clicked control as a compact quote line:
+Each Quoterm result is inserted immediately before/above or after/below the clicked control as a compact quote line:
 
 ```text
 > severity: message
 ```
 
-Success and info examples use `duration: 5000` and auto-dismiss. Warning and error examples use `duration: 0` and persist until the close button is pressed. Scroll the page after triggering a quote to confirm it moves naturally with the row because it is in normal document flow.
+Use the controls at the top of the page to switch placement, theme, timed versus persistent duration, and the host's max visible item count. Scroll the page after triggering a quote to confirm it moves naturally with the row because it is in normal document flow.

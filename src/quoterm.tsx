@@ -2,7 +2,7 @@ import * as React from "react";
 import { createPortal } from "react-dom";
 
 export type QuotermVariant = "success" | "warning" | "error" | "info";
-export type QuotermPlacement = "auto" | "top" | "bottom";
+export type QuotermPlacement = "auto" | "top" | "bottom" | "before" | "after" | "above" | "below";
 export type QuotermTheme = "light" | "dark" | "auto";
 export type QuotermSource = EventTarget | Element | React.RefObject<Element | null> | DOMRect | null;
 
@@ -239,6 +239,10 @@ function defaultFormatCommand(_variant: QuotermVariant, item: QuotermState) {
   return item.command ?? "";
 }
 
+function getInlinePlacement(placement?: QuotermPlacement): "before" | "after" {
+  return placement === "bottom" || placement === "after" || placement === "below" ? "after" : "before";
+}
+
 function getPrimaryMessage(item: QuotermState) {
   return item.title ?? item.message ?? item.description ?? "";
 }
@@ -290,7 +294,9 @@ function QuotermItem({
         <div className="quoterm__body">
           {command ? <div className="quoterm__command">$ {command}</div> : null}
           <div className="quoterm__quote">
-            <span aria-hidden="true">&gt; </span>
+            <span className="quoterm__prompt" aria-hidden="true">
+              &gt;{" "}
+            </span>
             <span className="quoterm__variant">{item.variant}: </span>
             {primary}
           </div>
@@ -331,15 +337,22 @@ function InlineQuotermPortal({
   React.useLayoutEffect(() => {
     if (!container || !item.sourceElement?.parentNode) return;
 
+    const inlinePlacement = getInlinePlacement(item.placement);
     container.className = "quoterm-inline-slot";
     container.dataset.quoterm = "inline-slot";
     container.dataset.quotermSlot = "inline";
-    item.sourceElement.parentNode.insertBefore(container, item.sourceElement);
+    container.dataset.quotermPlacement = inlinePlacement;
+
+    if (inlinePlacement === "after") {
+      item.sourceElement.parentNode.insertBefore(container, item.sourceElement.nextSibling);
+    } else {
+      item.sourceElement.parentNode.insertBefore(container, item.sourceElement);
+    }
 
     return () => {
       container.remove();
     };
-  }, [container, item.sourceElement]);
+  }, [container, item.placement, item.sourceElement]);
 
   if (!container) return null;
 
