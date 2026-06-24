@@ -2,7 +2,14 @@
   display: block;
   width: fit-content;
   max-width: min(100%, 36rem);
+}
+
+.quoterm-inline-slot[data-quoterm-placement="before"] {
   margin: 0 0 0.35rem;
+}
+
+.quoterm-inline-slot[data-quoterm-placement="after"] {
+  margin: 0.35rem 0 0;
 }
 
 .quoterm-fallback-root {
@@ -106,6 +113,10 @@
   font-weight: 750;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.quoterm__prompt {
+  color: var(--quoterm-border);
 }
 
 .quoterm__variant {

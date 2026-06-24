@@ -12,11 +12,10 @@ afterEach(() => {
     dismissQuoterm();
   });
   vi.useRealTimers();
-
 });
 
 describe("quoterm", () => {
-  it("renders source-bound feedback immediately before the source element in DOM flow", () => {
+  it("renders source-bound feedback immediately before the source element in DOM flow by default", () => {
     render(
       <div>
         <QuotermHost />
@@ -32,12 +31,54 @@ describe("quoterm", () => {
     expect(feedback.textContent).toContain("> success: Saved");
     expect(feedback.textContent).toContain("Changes landed.");
     expect(feedback.parentElement?.dataset.quotermSlot).toBe("inline");
+    expect(feedback.parentElement?.dataset.quotermPlacement).toBe("before");
     expect(clickSource().previousElementSibling).toBe(feedback.parentElement);
     expect(feedback.getAttribute("style") ?? "").not.toMatch(/top|left|position/i);
     expect(document.querySelector(".quoterm-fallback-root")).toBeNull();
   });
 
-  it("formats each visible severity as a compact prompt line", () => {
+  it("renders source-bound feedback immediately after the source element when requested", () => {
+    render(
+      <div>
+        <QuotermHost />
+        <button type="button">Source action</button>
+        <span data-testid="next-sibling">Next sibling</span>
+      </div>,
+    );
+
+    act(() => {
+      quoterm({ source: clickSource(), title: "Saved below", placement: "after", duration: 0 });
+    });
+
+    const feedback = screen.getByRole("status");
+    const slot = feedback.parentElement;
+    expect(slot?.dataset.quotermSlot).toBe("inline");
+    expect(slot?.dataset.quotermPlacement).toBe("after");
+    expect(clickSource().nextElementSibling).toBe(slot);
+    expect(slot?.nextElementSibling).toBe(screen.getByTestId("next-sibling"));
+    expect(feedback.getAttribute("style") ?? "").not.toMatch(/top|left|position/i);
+    expect(document.querySelector(".quoterm-fallback-root")).toBeNull();
+  });
+
+  it("accepts bottom and below as after-placement aliases", () => {
+    render(
+      <div>
+        <QuotermHost maxItems={2} />
+        <button type="button">Source action</button>
+      </div>,
+    );
+
+    act(() => {
+      const source = clickSource();
+      quoterm({ source, title: "Bottom alias", placement: "bottom", duration: 0 });
+      quoterm({ source, title: "Below alias", placement: "below", duration: 0 });
+    });
+
+    expect(screen.getByText(/Bottom alias/).closest("section")?.parentElement?.dataset.quotermPlacement).toBe("after");
+    expect(screen.getByText(/Below alias/).closest("section")?.parentElement?.dataset.quotermPlacement).toBe("after");
+  });
+
+  it("formats each visible severity as a compact prompt line with a colorable prompt marker", () => {
     render(
       <div>
         <QuotermHost maxItems={4} />
@@ -57,6 +98,7 @@ describe("quoterm", () => {
     expect(screen.getByText(/warning:/).closest("section")?.textContent).toContain("> warning: Review");
     expect(screen.getByText(/error:/).closest("section")?.textContent).toContain("> error: Failed");
     expect(screen.getByText(/info:/).closest("section")?.textContent).toContain("> info: Queued");
+    expect(document.querySelectorAll(".quoterm__prompt")).toHaveLength(4);
   });
 
   it("uses alert semantics for warnings and errors", () => {

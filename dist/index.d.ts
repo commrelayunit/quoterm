@@ -1,7 +1,7 @@
 import * as React from 'react';
 
 type QuotermVariant = "success" | "warning" | "error" | "info";
-type QuotermPlacement = "auto" | "top" | "bottom";
+type QuotermPlacement = "auto" | "top" | "bottom" | "before" | "after" | "above" | "below";
 type QuotermTheme = "light" | "dark" | "auto";
 type QuotermSource = EventTarget | Element | React.RefObject<Element | null> | DOMRect | null;
 interface QuotermInput {
