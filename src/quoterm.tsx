@@ -63,6 +63,7 @@ type Listener = () => void;
 const DEFAULT_MAX_ITEMS = 3;
 const DEFAULT_MAX_WIDTH = 360;
 const DEFAULT_GUTTER = 16;
+const INLINE_GAP = 6;
 
 let nextId = 0;
 let snapshot: QuotermSnapshot = { items: [] };
@@ -322,43 +323,51 @@ function QuotermItem({
 function InlineQuotermPortal({
   item,
   theme,
-  maxWidth,
+  zIndex,
   renderIcon,
   formatCommand,
 }: {
   item: QuotermState;
   theme: QuotermTheme;
-  maxWidth: number;
+  zIndex: number;
   renderIcon: ((variant: QuotermVariant) => React.ReactNode) | undefined;
   formatCommand: (variant: QuotermVariant, item: QuotermState) => string;
 }) {
-  const [container] = React.useState(() => (typeof document === "undefined" ? null : document.createElement("div")));
+  const [rect, setRect] = React.useState<DOMRect | null>(null);
 
   React.useLayoutEffect(() => {
-    if (!container || !item.sourceElement?.parentNode) return;
-
-    const inlinePlacement = getInlinePlacement(item.placement);
-    container.className = "quoterm-inline-slot";
-    container.dataset.quoterm = "inline-slot";
-    container.dataset.quotermSlot = "inline";
-    container.dataset.quotermPlacement = inlinePlacement;
-
-    if (inlinePlacement === "after") {
-      item.sourceElement.parentNode.insertBefore(container, item.sourceElement.nextSibling);
-    } else {
-      item.sourceElement.parentNode.insertBefore(container, item.sourceElement);
-    }
-
+    const el = item.sourceElement;
+    if (!el) return;
+    const update = () => setRect(el.getBoundingClientRect());
+    update();
+    window.addEventListener("scroll", update, { passive: true, capture: true });
+    window.addEventListener("resize", update, { passive: true });
     return () => {
-      container.remove();
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
     };
-  }, [container, item.placement, item.sourceElement]);
+  }, [item.sourceElement]);
 
-  if (!container) return null;
+  if (!rect || typeof document === "undefined") return null;
+
+  const placement = getInlinePlacement(item.placement);
+  const vh = typeof window !== "undefined" ? window.innerHeight : 600;
+
+  const posStyle: React.CSSProperties =
+    placement === "after"
+      ? { top: rect.bottom + INLINE_GAP }
+      : { bottom: vh - rect.top + INLINE_GAP };
 
   return createPortal(
-    <QuotermItem item={item} theme={theme} maxWidth={maxWidth} renderIcon={renderIcon} formatCommand={formatCommand} />,
-    container,
+    <div
+      className="quoterm-inline-root"
+      data-quoterm="inline-slot"
+      data-quoterm-placement={placement}
+      style={{ position: "fixed", left: rect.left, width: rect.width, zIndex, ...posStyle }}
+    >
+      <QuotermItem item={item} theme={theme} maxWidth={rect.width} renderIcon={renderIcon} formatCommand={formatCommand} />
+    </div>,
+    document.body,
   );
 }
 
@@ -419,7 +428,7 @@ export function QuotermHost({
             key={item.id}
             item={item}
             theme={itemTheme}
-            maxWidth={maxWidth}
+            zIndex={zIndex}
             renderIcon={renderIcon}
             formatCommand={formatCommand}
           />

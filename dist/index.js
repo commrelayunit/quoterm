@@ -5,6 +5,7 @@ import { Fragment, jsx, jsxs } from "react/jsx-runtime";
 var DEFAULT_MAX_ITEMS = 3;
 var DEFAULT_MAX_WIDTH = 360;
 var DEFAULT_GUTTER = 16;
+var INLINE_GAP = 6;
 var nextId = 0;
 var snapshot = { items: [] };
 var listeners = /* @__PURE__ */ new Set();
@@ -225,31 +226,39 @@ function QuotermItem({
 function InlineQuotermPortal({
   item,
   theme,
-  maxWidth,
+  zIndex,
   renderIcon,
   formatCommand
 }) {
-  const [container] = React.useState(() => typeof document === "undefined" ? null : document.createElement("div"));
+  const [rect, setRect] = React.useState(null);
   React.useLayoutEffect(() => {
-    if (!container || !item.sourceElement?.parentNode) return;
-    const inlinePlacement = getInlinePlacement(item.placement);
-    container.className = "quoterm-inline-slot";
-    container.dataset.quoterm = "inline-slot";
-    container.dataset.quotermSlot = "inline";
-    container.dataset.quotermPlacement = inlinePlacement;
-    if (inlinePlacement === "after") {
-      item.sourceElement.parentNode.insertBefore(container, item.sourceElement.nextSibling);
-    } else {
-      item.sourceElement.parentNode.insertBefore(container, item.sourceElement);
-    }
+    const el = item.sourceElement;
+    if (!el) return;
+    const update = () => setRect(el.getBoundingClientRect());
+    update();
+    window.addEventListener("scroll", update, { passive: true, capture: true });
+    window.addEventListener("resize", update, { passive: true });
     return () => {
-      container.remove();
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
     };
-  }, [container, item.placement, item.sourceElement]);
-  if (!container) return null;
+  }, [item.sourceElement]);
+  if (!rect || typeof document === "undefined") return null;
+  const placement = getInlinePlacement(item.placement);
+  const vh = typeof window !== "undefined" ? window.innerHeight : 600;
+  const posStyle = placement === "after" ? { top: rect.bottom + INLINE_GAP } : { bottom: vh - rect.top + INLINE_GAP };
   return createPortal(
-    /* @__PURE__ */ jsx(QuotermItem, { item, theme, maxWidth, renderIcon, formatCommand }),
-    container
+    /* @__PURE__ */ jsx(
+      "div",
+      {
+        className: "quoterm-inline-root",
+        "data-quoterm": "inline-slot",
+        "data-quoterm-placement": placement,
+        style: { position: "fixed", left: rect.left, width: rect.width, zIndex, ...posStyle },
+        children: /* @__PURE__ */ jsx(QuotermItem, { item, theme, maxWidth: rect.width, renderIcon, formatCommand })
+      }
+    ),
+    document.body
   );
 }
 function FallbackQuotermPortal({
@@ -291,7 +300,7 @@ function QuotermHost({
       {
         item,
         theme: itemTheme,
-        maxWidth,
+        zIndex,
         renderIcon,
         formatCommand
       },
