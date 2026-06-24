@@ -115,7 +115,10 @@
   -webkit-line-clamp: 2;
 }
 
-.quoterm__prompt,
+.quoterm__prompt {
+  color: var(--quoterm-border);
+}
+
 .quoterm__variant {
   color: var(--quoterm-muted);
 }
