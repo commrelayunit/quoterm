@@ -337,14 +337,35 @@ function InlineQuotermPortal({
 
   React.useLayoutEffect(() => {
     const el = item.sourceElement;
-    if (!el) return;
-    const update = () => setRect(el.getBoundingClientRect());
+    if (!el || typeof window === "undefined") return;
+
+    let frame: number | null = null;
+    const update = () => {
+      frame = null;
+      setRect(el.getBoundingClientRect());
+    };
+    const scheduleUpdate = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(update);
+    };
+
     update();
-    window.addEventListener("scroll", update, { passive: true, capture: true });
-    window.addEventListener("resize", update, { passive: true });
+    window.addEventListener("scroll", scheduleUpdate, { passive: true, capture: true });
+    window.addEventListener("resize", scheduleUpdate, { passive: true });
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            scheduleUpdate();
+          });
+    resizeObserver?.observe(el);
+
     return () => {
-      window.removeEventListener("scroll", update, true);
-      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", scheduleUpdate, true);
+      window.removeEventListener("resize", scheduleUpdate);
+      resizeObserver?.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
     };
   }, [item.sourceElement]);
 
@@ -360,8 +381,9 @@ function InlineQuotermPortal({
 
   return createPortal(
     <div
-      className="quoterm-inline-root"
+      className="quoterm-inline-root quoterm-inline-slot"
       data-quoterm="inline-slot"
+      data-quoterm-slot="inline"
       data-quoterm-placement={placement}
       style={{ position: "fixed", left: rect.left, width: rect.width, zIndex, ...posStyle }}
     >

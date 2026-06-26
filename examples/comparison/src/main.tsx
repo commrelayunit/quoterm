@@ -112,8 +112,20 @@ function ScenarioCard({
   duration: number;
 }) {
   const cardRef = React.useRef<HTMLElement>(null);
+  const asyncTimeoutRef = React.useRef<number | null>(null);
+
+  React.useEffect(() => {
+    return () => {
+      if (asyncTimeoutRef.current !== null) window.clearTimeout(asyncTimeoutRef.current);
+    };
+  }, []);
 
   const fireQuoterm = () => {
+    if (asyncTimeoutRef.current !== null) {
+      window.clearTimeout(asyncTimeoutRef.current);
+      asyncTimeoutRef.current = null;
+    }
+
     if (scenario.id === "async") {
       const handle = quoterm({
         source: cardRef.current,
@@ -125,10 +137,10 @@ function ScenarioCard({
         placement,
         theme,
       });
-      window.setTimeout(
-        () => handle.update({ variant: "success", title: "Index complete", message: "1,284 chunks indexed.", duration }),
-        1400,
-      );
+      asyncTimeoutRef.current = window.setTimeout(() => {
+        asyncTimeoutRef.current = null;
+        handle.update({ variant: "success", title: "Index complete", message: "1,284 chunks indexed.", duration });
+      }, 1400);
     } else {
       quoterm({
         source: cardRef.current,

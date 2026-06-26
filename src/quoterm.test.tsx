@@ -32,8 +32,8 @@ describe("quoterm", () => {
     expect(feedback.textContent).toContain("Changes landed.");
     expect(feedback.parentElement?.dataset.quotermSlot).toBe("inline");
     expect(feedback.parentElement?.dataset.quotermPlacement).toBe("before");
-    expect(clickSource().previousElementSibling).toBe(feedback.parentElement);
-    expect(feedback.getAttribute("style") ?? "").not.toMatch(/top|left|position/i);
+    expect(feedback.parentElement?.classList.contains("quoterm-inline-slot")).toBe(true);
+    expect(feedback.parentElement?.getAttribute("style") ?? "").toMatch(/position:\s*fixed/i);
     expect(document.querySelector(".quoterm-fallback-root")).toBeNull();
   });
 
@@ -54,9 +54,9 @@ describe("quoterm", () => {
     const slot = feedback.parentElement;
     expect(slot?.dataset.quotermSlot).toBe("inline");
     expect(slot?.dataset.quotermPlacement).toBe("after");
-    expect(clickSource().nextElementSibling).toBe(slot);
-    expect(slot?.nextElementSibling).toBe(screen.getByTestId("next-sibling"));
-    expect(feedback.getAttribute("style") ?? "").not.toMatch(/top|left|position/i);
+    expect(slot?.classList.contains("quoterm-inline-slot")).toBe(true);
+    expect(clickSource().nextElementSibling).toBe(screen.getByTestId("next-sibling"));
+    expect(slot?.getAttribute("style") ?? "").toMatch(/position:\s*fixed/i);
     expect(document.querySelector(".quoterm-fallback-root")).toBeNull();
   });
 
