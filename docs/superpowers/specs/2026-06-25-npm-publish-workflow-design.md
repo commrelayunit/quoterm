@@ -46,10 +46,10 @@ Each job runs `npm ci` independently before its check.
 
 1. **`publish`**
    - Runs `npm ci`
-   - Runs `npm publish --provenance --access public` using npm Trusted Publishing (OIDC)
-   - Requires npm package Trusted Publisher configuration, not an `NPM_TOKEN` secret
-   - Requires permissions: `id-token: write`, `contents: read`
-   - Uses Node 24 so the bundled npm satisfies npm Trusted Publishing requirements
+   - Runs `npm publish --provenance --access public` using a granular npm automation token stored as `NPM_TOKEN`
+   - Requires GitHub repository secret `NPM_TOKEN` containing a granular npm token with publish permission and bypass 2FA enabled
+   - Uses `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}` for npm authentication; `id-token: write` remains enabled for npm provenance attestation
+   - Uses Node 24 so the bundled npm supports provenance publishing cleanly
    - The existing `prepack` script in `package.json` runs `build` automatically before publish
 
 2. **`create-release`** (depends on `publish`)
@@ -77,13 +77,13 @@ git push origin main --follow-tags
 | `contents: read` | `publish` job permissions | Read repository contents for npm publish |
 | `contents: write` | `create-release` job permissions | Create GitHub Release |
 
-No `NPM_TOKEN` or `NODE_AUTH_TOKEN` is used. npm Trusted Publishing should be configured on npmjs.com for:
+`NPM_TOKEN` is required as a GitHub repository secret. It should be a granular npm token with:
 
-- GitHub organization/repository: `commrelayunit/quoterm`
-- Workflow filename: `release.yml`
-- Allowed action: `npm publish`
+- package access: publish/read-write for `quoterm` (or all packages until the package exists, then narrow if npm allows)
+- bypass 2FA enabled for automation
+- the shortest practical expiration
 
-Because `quoterm` is not yet published on npm, the first package creation may need to be done manually by an npm package owner before Trusted Publishing can be attached to the package.
+`NODE_AUTH_TOKEN` is set only inside the publish step from `${{ secrets.NPM_TOKEN }}`.
 
 ## Files Changed
 
