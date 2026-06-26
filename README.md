@@ -1,6 +1,6 @@
 # Quoterm
 
-[![npm planned](https://img.shields.io/badge/npm-planned-lightgrey)](#installation)
+[![npm version](https://img.shields.io/npm/v/quoterm.svg)](https://www.npmjs.com/package/quoterm)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-ready-3178c6)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.2%2B%20%7C%2019-61dafb)](https://react.dev/)
@@ -9,20 +9,10 @@ Quoted terminal-style inline feedback for React — a compact alternative to det
 
 Quoterm is for messages that should stay near the thing they explain: CLI-style command results, form feedback, generated citations, background task status, import warnings, and other “this happened here” UI moments. Toasts float away from context; with a `source` element, Quoterm renders a fixed-position banner anchored to that element — spanning its full width, with no layout shift.
 
-> Status: public package skeleton is ready, but **not published to npm yet**. Do not rely on `npm install quoterm` until the first release is explicitly published.
-
 ## Installation
-
-Future npm install, once published:
 
 ```sh
 npm install quoterm
-```
-
-Until then, install from GitHub or copy the component source:
-
-```sh
-npm install github:commrelayunit/quoterm
 ```
 
 ```tsx
