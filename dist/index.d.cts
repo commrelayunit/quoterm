@@ -15,6 +15,7 @@ interface QuotermInput {
     sourceRect?: DOMRect | null;
     duration?: number | null;
     className?: string;
+    minWidth?: number;
     style?: React.CSSProperties;
     dismissLabel?: string;
     placement?: QuotermPlacement;
@@ -44,11 +45,20 @@ interface QuotermHostProps {
     maxItems?: number;
     gutter?: number;
     maxWidth?: number;
+    /** Shorthand for inlineWidth.min. */
+    minWidth?: number;
+    inlineWidth?: QuotermInlineWidthOptions;
     zIndex?: number;
     theme?: QuotermTheme;
     portalTarget?: Element | DocumentFragment | null;
     renderIcon?: (variant: QuotermVariant) => React.ReactNode;
     formatCommand?: (variant: QuotermVariant, item: QuotermState) => string;
+}
+interface QuotermInlineWidthOptions {
+    min?: number;
+    max?: number;
+    /** Multiplies the source width before clamping. Defaults to 2.5. */
+    sourceScale?: number;
 }
 declare function getQuotermsSnapshot(): QuotermSnapshot;
 declare function dismissQuoterm(id?: string): void;
@@ -58,6 +68,6 @@ declare function useQuoterm(): {
     quoterm: typeof quoterm;
     dismiss: typeof dismissQuoterm;
 };
-declare function QuotermHost({ className, maxItems, gutter, maxWidth, zIndex, theme, portalTarget, renderIcon, formatCommand, }: QuotermHostProps): React.JSX.Element | null;
+declare function QuotermHost({ className, maxItems, gutter, maxWidth, minWidth, inlineWidth, zIndex, theme, portalTarget, renderIcon, formatCommand, }: QuotermHostProps): React.JSX.Element | null;
 
 export { type QuotermApi, type QuotermDismiss, QuotermHost, type QuotermHostProps, type QuotermInput, type QuotermPlacement, type QuotermSnapshot, type QuotermSource, type QuotermState, type QuotermTheme, type QuotermVariant, dismissQuoterm, getQuotermsSnapshot, quoterm, useQuoterm };

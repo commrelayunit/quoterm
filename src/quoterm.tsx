@@ -17,6 +17,7 @@ export interface QuotermInput {
   sourceRect?: DOMRect | null;
   duration?: number | null;
   className?: string;
+  minWidth?: number;
   style?: React.CSSProperties;
   dismissLabel?: string;
   placement?: QuotermPlacement;
@@ -51,6 +52,9 @@ export interface QuotermHostProps {
   maxItems?: number;
   gutter?: number;
   maxWidth?: number;
+  /** Shorthand for inlineWidth.min. */
+  minWidth?: number;
+  inlineWidth?: QuotermInlineWidthOptions;
   zIndex?: number;
   theme?: QuotermTheme;
   portalTarget?: Element | DocumentFragment | null;
@@ -58,11 +62,28 @@ export interface QuotermHostProps {
   formatCommand?: (variant: QuotermVariant, item: QuotermState) => string;
 }
 
+export interface QuotermInlineWidthOptions {
+  min?: number;
+  max?: number;
+  /** Multiplies the source width before clamping. Defaults to 2.5. */
+  sourceScale?: number;
+}
+
 type Listener = () => void;
 
 const DEFAULT_MAX_ITEMS = 3;
 const DEFAULT_MAX_WIDTH = 360;
+const DEFAULT_MIN_WIDTH = 280;
+const DEFAULT_INLINE_WIDTH: Required<QuotermInlineWidthOptions> = {
+  min: DEFAULT_MIN_WIDTH,
+  max: DEFAULT_MAX_WIDTH,
+  sourceScale: 2.5,
+};
 const DEFAULT_GUTTER = 16;
+const DEFAULT_DURATION_BY_VARIANT: Partial<Record<QuotermVariant, number>> = {
+  success: 4000,
+  info: 6000,
+};
 const INLINE_GAP = 6;
 
 let nextId = 0;
@@ -132,6 +153,14 @@ function clearTimer(id: string) {
   timers.delete(id);
 }
 
+function getDefaultDuration(variant: QuotermVariant) {
+  return DEFAULT_DURATION_BY_VARIANT[variant] ?? null;
+}
+
+function resolveDuration(item: Pick<QuotermState, "variant" | "duration">, explicitDuration?: number | null) {
+  return explicitDuration === undefined ? getDefaultDuration(item.variant) : explicitDuration;
+}
+
 function scheduleDismiss(id: string, duration?: number | null) {
   clearTimer(id);
   if (typeof window === "undefined") return;
@@ -144,6 +173,7 @@ function scheduleDismiss(id: string, duration?: number | null) {
     }, duration),
   );
 }
+
 
 function normalizeItem(input: QuotermInput): QuotermState {
   const { source, sourceRect, ...rest } = input;
@@ -178,7 +208,7 @@ export function dismissQuoterm(id?: string) {
 export function quoterm(input: QuotermInput): QuotermApi {
   const item = normalizeItem(input);
   setSnapshot({ items: [item, ...snapshot.items.filter((existing) => existing.id !== item.id)] });
-  scheduleDismiss(item.id, input.duration);
+  scheduleDismiss(item.id, resolveDuration(item, input.duration));
 
   return {
     id: item.id,
@@ -196,7 +226,10 @@ export function quoterm(input: QuotermInput): QuotermApi {
         };
       });
       setSnapshot({ items: nextItems });
-      if (patch.duration !== undefined) scheduleDismiss(item.id, patch.duration);
+      const updated = nextItems.find((existing) => existing.id === item.id);
+      if (updated && (patch.duration !== undefined || patch.variant !== undefined)) {
+        scheduleDismiss(item.id, resolveDuration(updated, patch.duration));
+      }
     },
   };
 }
@@ -213,18 +246,45 @@ export function useQuoterm() {
   );
 }
 
-function getDocumentPosition(item: QuotermState, options: Required<Pick<QuotermHostProps, "gutter" | "maxWidth">>) {
-  if (typeof window === "undefined") return { top: options.gutter, left: options.gutter, maxWidth: options.maxWidth };
+function finitePositive(value: number | undefined, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+function clampWidth(width: number, minWidth: number, maxWidth: number, viewportWidth: number, gutter: number) {
+  const availableWidth = Math.max(0, viewportWidth - gutter * 2);
+  const itemMaxWidth = Math.max(1, maxWidth);
+  const preferredMinWidth = Math.min(Math.max(1, minWidth), itemMaxWidth, availableWidth || itemMaxWidth);
+  return Math.max(preferredMinWidth, Math.min(Math.max(1, width), itemMaxWidth, availableWidth || itemMaxWidth));
+}
+
+function getInlineSize(
+  rect: DOMRect,
+  options: QuotermInlineWidthOptions | undefined,
+  fallbackMinWidth: number,
+  fallbackMaxWidth: number,
+  viewportWidth: number,
+  gutter: number,
+) {
+  const minWidth = finitePositive(options?.min, fallbackMinWidth);
+  const maxWidth = finitePositive(options?.max, fallbackMaxWidth);
+  const sourceScale = finitePositive(options?.sourceScale, DEFAULT_INLINE_WIDTH.sourceScale);
+  const width = clampWidth(rect.width * sourceScale, minWidth, maxWidth, viewportWidth, gutter);
+  const left = Math.min(Math.max(gutter, rect.left + rect.width / 2 - width / 2), Math.max(gutter, viewportWidth - width - gutter));
+  return { left, width };
+}
+
+function getDocumentPosition(item: QuotermState, options: Required<Pick<QuotermHostProps, "gutter" | "maxWidth" | "minWidth">>) {
+  if (typeof window === "undefined") return { top: options.gutter, left: options.gutter, width: options.maxWidth };
 
   const viewportWidth = window.innerWidth || options.maxWidth + options.gutter * 2;
-  const maxWidth = Math.min(options.maxWidth, viewportWidth - options.gutter * 2);
+  const width = clampWidth(options.maxWidth, options.minWidth, options.maxWidth, viewportWidth, options.gutter);
   const scrollX = window.scrollX || window.pageXOffset || 0;
   const scrollY = window.scrollY || window.pageYOffset || 0;
 
   return {
     top: scrollY + options.gutter,
-    left: scrollX + Math.max(options.gutter, viewportWidth - maxWidth - options.gutter),
-    maxWidth,
+    left: scrollX + Math.max(options.gutter, viewportWidth - width - options.gutter),
+    width,
   };
 }
 
@@ -262,13 +322,13 @@ function getDetailMessages(item: QuotermState) {
 function QuotermItem({
   item,
   theme,
-  maxWidth,
+  width,
   renderIcon,
   formatCommand,
 }: {
   item: QuotermState;
   theme: QuotermTheme;
-  maxWidth: number;
+  width: number;
   renderIcon: ((variant: QuotermVariant) => React.ReactNode) | undefined;
   formatCommand: (variant: QuotermVariant, item: QuotermState) => string;
 }) {
@@ -286,7 +346,7 @@ function QuotermItem({
       data-variant={item.variant}
       data-theme={theme}
       className={["quoterm", `quoterm--${item.variant}`, item.className].filter(Boolean).join(" ")}
-      style={{ ...item.style, maxWidth }}
+      style={{ ...item.style, maxWidth: width }}
     >
       <div className="quoterm__row">
         <span className="quoterm__icon" aria-hidden="true">
@@ -324,12 +384,20 @@ function InlineQuotermPortal({
   item,
   theme,
   zIndex,
+  maxWidth,
+  minWidth,
+  inlineWidth,
+  gutter,
   renderIcon,
   formatCommand,
 }: {
   item: QuotermState;
   theme: QuotermTheme;
   zIndex: number;
+  maxWidth: number;
+  minWidth: number;
+  inlineWidth: QuotermInlineWidthOptions | undefined;
+  gutter: number;
   renderIcon: ((variant: QuotermVariant) => React.ReactNode) | undefined;
   formatCommand: (variant: QuotermVariant, item: QuotermState) => string;
 }) {
@@ -373,6 +441,10 @@ function InlineQuotermPortal({
 
   const placement = getInlinePlacement(item.placement);
   const vh = typeof window !== "undefined" ? window.innerHeight : 600;
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : maxWidth + gutter * 2;
+  const widthOptions: QuotermInlineWidthOptions = { ...inlineWidth };
+  if (item.minWidth !== undefined) widthOptions.min = item.minWidth;
+  const inlineSize = getInlineSize(rect, widthOptions, minWidth, maxWidth, viewportWidth, gutter);
 
   const posStyle: React.CSSProperties =
     placement === "after"
@@ -385,9 +457,9 @@ function InlineQuotermPortal({
       data-quoterm="inline-slot"
       data-quoterm-slot="inline"
       data-quoterm-placement={placement}
-      style={{ position: "fixed", left: rect.left, width: rect.width, zIndex, ...posStyle }}
+      style={{ position: "fixed", left: inlineSize.left, width: inlineSize.width, zIndex, ...posStyle }}
     >
-      <QuotermItem item={item} theme={theme} maxWidth={rect.width} renderIcon={renderIcon} formatCommand={formatCommand} />
+      <QuotermItem item={item} theme={theme} width={inlineSize.width} renderIcon={renderIcon} formatCommand={formatCommand} />
     </div>,
     document.body,
   );
@@ -398,6 +470,7 @@ function FallbackQuotermPortal({
   theme,
   gutter,
   maxWidth,
+  minWidth,
   zIndex,
   portalTarget,
   renderIcon,
@@ -407,6 +480,7 @@ function FallbackQuotermPortal({
   theme: QuotermTheme;
   gutter: number;
   maxWidth: number;
+  minWidth: number;
   zIndex: number;
   portalTarget: Element | DocumentFragment | null | undefined;
   renderIcon: ((variant: QuotermVariant) => React.ReactNode) | undefined;
@@ -415,11 +489,11 @@ function FallbackQuotermPortal({
   if (typeof document === "undefined") return null;
 
   const target = portalTarget ?? document.body;
-  const position = getDocumentPosition(item, { gutter, maxWidth });
+  const position = getDocumentPosition(item, { gutter, maxWidth, minWidth: item.minWidth ?? minWidth });
 
   return createPortal(
     <div className="quoterm-fallback-root" data-quoterm="fallback-slot" style={{ top: position.top, left: position.left, zIndex }}>
-      <QuotermItem item={item} theme={theme} maxWidth={position.maxWidth} renderIcon={renderIcon} formatCommand={formatCommand} />
+      <QuotermItem item={item} theme={theme} width={position.width} renderIcon={renderIcon} formatCommand={formatCommand} />
     </div>,
     target,
   );
@@ -430,6 +504,8 @@ export function QuotermHost({
   maxItems = DEFAULT_MAX_ITEMS,
   gutter = DEFAULT_GUTTER,
   maxWidth = DEFAULT_MAX_WIDTH,
+  minWidth = DEFAULT_MIN_WIDTH,
+  inlineWidth,
   zIndex = 1000,
   theme = "auto",
   portalTarget,
@@ -451,6 +527,10 @@ export function QuotermHost({
             item={item}
             theme={itemTheme}
             zIndex={zIndex}
+            maxWidth={maxWidth}
+            minWidth={inlineWidth?.min ?? minWidth}
+            inlineWidth={inlineWidth ?? DEFAULT_INLINE_WIDTH}
+            gutter={gutter}
             renderIcon={renderIcon}
             formatCommand={formatCommand}
           />
@@ -461,6 +541,7 @@ export function QuotermHost({
             theme={itemTheme}
             gutter={gutter}
             maxWidth={maxWidth}
+            minWidth={minWidth}
             zIndex={zIndex}
             portalTarget={portalTarget}
             renderIcon={renderIcon}

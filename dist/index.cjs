@@ -44,7 +44,17 @@ var import_react_dom = require("react-dom");
 var import_jsx_runtime = require("react/jsx-runtime");
 var DEFAULT_MAX_ITEMS = 3;
 var DEFAULT_MAX_WIDTH = 360;
+var DEFAULT_MIN_WIDTH = 280;
+var DEFAULT_INLINE_WIDTH = {
+  min: DEFAULT_MIN_WIDTH,
+  max: DEFAULT_MAX_WIDTH,
+  sourceScale: 2.5
+};
 var DEFAULT_GUTTER = 16;
+var DEFAULT_DURATION_BY_VARIANT = {
+  success: 4e3,
+  info: 6e3
+};
 var INLINE_GAP = 6;
 var nextId = 0;
 var snapshot = { items: [] };
@@ -99,6 +109,12 @@ function clearTimer(id) {
   if (timer) clearTimeout(timer);
   timers.delete(id);
 }
+function getDefaultDuration(variant) {
+  return DEFAULT_DURATION_BY_VARIANT[variant] ?? null;
+}
+function resolveDuration(item, explicitDuration) {
+  return explicitDuration === void 0 ? getDefaultDuration(item.variant) : explicitDuration;
+}
 function scheduleDismiss(id, duration) {
   clearTimer(id);
   if (typeof window === "undefined") return;
@@ -138,7 +154,7 @@ function dismissQuoterm(id) {
 function quoterm(input) {
   const item = normalizeItem(input);
   setSnapshot({ items: [item, ...snapshot.items.filter((existing) => existing.id !== item.id)] });
-  scheduleDismiss(item.id, input.duration);
+  scheduleDismiss(item.id, resolveDuration(item, input.duration));
   return {
     id: item.id,
     dismiss: () => dismissQuoterm(item.id),
@@ -155,7 +171,10 @@ function quoterm(input) {
         };
       });
       setSnapshot({ items: nextItems });
-      if (patch.duration !== void 0) scheduleDismiss(item.id, patch.duration);
+      const updated = nextItems.find((existing) => existing.id === item.id);
+      if (updated && (patch.duration !== void 0 || patch.variant !== void 0)) {
+        scheduleDismiss(item.id, resolveDuration(updated, patch.duration));
+      }
     }
   };
 }
@@ -170,16 +189,33 @@ function useQuoterm() {
     [currentSnapshot]
   );
 }
+function finitePositive(value, fallback) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : fallback;
+}
+function clampWidth(width, minWidth, maxWidth, viewportWidth, gutter) {
+  const availableWidth = Math.max(0, viewportWidth - gutter * 2);
+  const itemMaxWidth = Math.max(1, maxWidth);
+  const preferredMinWidth = Math.min(Math.max(1, minWidth), itemMaxWidth, availableWidth || itemMaxWidth);
+  return Math.max(preferredMinWidth, Math.min(Math.max(1, width), itemMaxWidth, availableWidth || itemMaxWidth));
+}
+function getInlineSize(rect, options, fallbackMinWidth, fallbackMaxWidth, viewportWidth, gutter) {
+  const minWidth = finitePositive(options?.min, fallbackMinWidth);
+  const maxWidth = finitePositive(options?.max, fallbackMaxWidth);
+  const sourceScale = finitePositive(options?.sourceScale, DEFAULT_INLINE_WIDTH.sourceScale);
+  const width = clampWidth(rect.width * sourceScale, minWidth, maxWidth, viewportWidth, gutter);
+  const left = Math.min(Math.max(gutter, rect.left + rect.width / 2 - width / 2), Math.max(gutter, viewportWidth - width - gutter));
+  return { left, width };
+}
 function getDocumentPosition(item, options) {
-  if (typeof window === "undefined") return { top: options.gutter, left: options.gutter, maxWidth: options.maxWidth };
+  if (typeof window === "undefined") return { top: options.gutter, left: options.gutter, width: options.maxWidth };
   const viewportWidth = window.innerWidth || options.maxWidth + options.gutter * 2;
-  const maxWidth = Math.min(options.maxWidth, viewportWidth - options.gutter * 2);
+  const width = clampWidth(options.maxWidth, options.minWidth, options.maxWidth, viewportWidth, options.gutter);
   const scrollX = window.scrollX || window.pageXOffset || 0;
   const scrollY = window.scrollY || window.pageYOffset || 0;
   return {
     top: scrollY + options.gutter,
-    left: scrollX + Math.max(options.gutter, viewportWidth - maxWidth - options.gutter),
-    maxWidth
+    left: scrollX + Math.max(options.gutter, viewportWidth - width - options.gutter),
+    width
   };
 }
 function getRole(item) {
@@ -210,7 +246,7 @@ function getDetailMessages(item) {
 function QuotermItem({
   item,
   theme,
-  maxWidth,
+  width,
   renderIcon,
   formatCommand
 }) {
@@ -228,7 +264,7 @@ function QuotermItem({
       "data-variant": item.variant,
       "data-theme": theme,
       className: ["quoterm", `quoterm--${item.variant}`, item.className].filter(Boolean).join(" "),
-      style: { ...item.style, maxWidth },
+      style: { ...item.style, maxWidth: width },
       children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "quoterm__row", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "quoterm__icon", "aria-hidden": "true", children: icon }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "quoterm__body", children: [
@@ -267,6 +303,10 @@ function InlineQuotermPortal({
   item,
   theme,
   zIndex,
+  maxWidth,
+  minWidth,
+  inlineWidth,
+  gutter,
   renderIcon,
   formatCommand
 }) {
@@ -300,6 +340,10 @@ function InlineQuotermPortal({
   if (!rect || typeof document === "undefined") return null;
   const placement = getInlinePlacement(item.placement);
   const vh = typeof window !== "undefined" ? window.innerHeight : 600;
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : maxWidth + gutter * 2;
+  const widthOptions = { ...inlineWidth };
+  if (item.minWidth !== void 0) widthOptions.min = item.minWidth;
+  const inlineSize = getInlineSize(rect, widthOptions, minWidth, maxWidth, viewportWidth, gutter);
   const posStyle = placement === "after" ? { top: rect.bottom + INLINE_GAP } : { bottom: vh - rect.top + INLINE_GAP };
   return (0, import_react_dom.createPortal)(
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
@@ -309,8 +353,8 @@ function InlineQuotermPortal({
         "data-quoterm": "inline-slot",
         "data-quoterm-slot": "inline",
         "data-quoterm-placement": placement,
-        style: { position: "fixed", left: rect.left, width: rect.width, zIndex, ...posStyle },
-        children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QuotermItem, { item, theme, maxWidth: rect.width, renderIcon, formatCommand })
+        style: { position: "fixed", left: inlineSize.left, width: inlineSize.width, zIndex, ...posStyle },
+        children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QuotermItem, { item, theme, width: inlineSize.width, renderIcon, formatCommand })
       }
     ),
     document.body
@@ -321,6 +365,7 @@ function FallbackQuotermPortal({
   theme,
   gutter,
   maxWidth,
+  minWidth,
   zIndex,
   portalTarget,
   renderIcon,
@@ -328,9 +373,9 @@ function FallbackQuotermPortal({
 }) {
   if (typeof document === "undefined") return null;
   const target = portalTarget ?? document.body;
-  const position = getDocumentPosition(item, { gutter, maxWidth });
+  const position = getDocumentPosition(item, { gutter, maxWidth, minWidth: item.minWidth ?? minWidth });
   return (0, import_react_dom.createPortal)(
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "quoterm-fallback-root", "data-quoterm": "fallback-slot", style: { top: position.top, left: position.left, zIndex }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QuotermItem, { item, theme, maxWidth: position.maxWidth, renderIcon, formatCommand }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "quoterm-fallback-root", "data-quoterm": "fallback-slot", style: { top: position.top, left: position.left, zIndex }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QuotermItem, { item, theme, width: position.width, renderIcon, formatCommand }) }),
     target
   );
 }
@@ -339,6 +384,8 @@ function QuotermHost({
   maxItems = DEFAULT_MAX_ITEMS,
   gutter = DEFAULT_GUTTER,
   maxWidth = DEFAULT_MAX_WIDTH,
+  minWidth = DEFAULT_MIN_WIDTH,
+  inlineWidth,
   zIndex = 1e3,
   theme = "auto",
   portalTarget,
@@ -356,6 +403,10 @@ function QuotermHost({
         item,
         theme: itemTheme,
         zIndex,
+        maxWidth,
+        minWidth: inlineWidth?.min ?? minWidth,
+        inlineWidth: inlineWidth ?? DEFAULT_INLINE_WIDTH,
+        gutter,
         renderIcon,
         formatCommand
       },
@@ -367,6 +418,7 @@ function QuotermHost({
         theme: itemTheme,
         gutter,
         maxWidth,
+        minWidth,
         zIndex,
         portalTarget,
         renderIcon,

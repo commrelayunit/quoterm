@@ -136,18 +136,46 @@ describe("quoterm", () => {
     expect(screen.queryByText(/Short-lived/)).toBeNull();
   });
 
-  it("persists when duration is undefined, null, or zero", () => {
+  it("auto dismisses success and info by default", () => {
     vi.useFakeTimers();
     render(
       <div>
-        <QuotermHost maxItems={3} />
+        <QuotermHost maxItems={2} />
         <button type="button">Source action</button>
       </div>,
     );
 
     act(() => {
       const source = clickSource();
-      quoterm({ source, title: "Undefined duration", id: "undefined-duration" });
+      quoterm({ source, title: "Default success", id: "default-success" });
+      quoterm({ source, title: "Default info", id: "default-info", variant: "info" });
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(4001);
+    });
+    expect(screen.queryByText(/Default success/)).toBeNull();
+    expect(screen.getByText(/Default info/)).toBeTruthy();
+
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(screen.queryByText(/Default info/)).toBeNull();
+  });
+
+  it("persists warnings, errors, and explicit null or zero durations", () => {
+    vi.useFakeTimers();
+    render(
+      <div>
+        <QuotermHost maxItems={4} />
+        <button type="button">Source action</button>
+      </div>,
+    );
+
+    act(() => {
+      const source = clickSource();
+      quoterm({ source, title: "Default warning", id: "default-warning", variant: "warning" });
+      quoterm({ source, title: "Default error", id: "default-error", variant: "error" });
       quoterm({ source, title: "Null duration", id: "null-duration", duration: null });
       quoterm({ source, title: "Zero duration", id: "zero-duration", duration: 0 });
     });
@@ -156,9 +184,93 @@ describe("quoterm", () => {
       vi.advanceTimersByTime(60_000);
     });
 
-    expect(screen.getByText(/Undefined duration/)).toBeTruthy();
+    expect(screen.getByText(/Default warning/)).toBeTruthy();
+    expect(screen.getByText(/Default error/)).toBeTruthy();
     expect(screen.getByText(/Null duration/)).toBeTruthy();
     expect(screen.getByText(/Zero duration/)).toBeTruthy();
+  });
+
+  it("uses a host min width for inline feedback anchored to narrow source elements", () => {
+    render(
+      <div>
+        <QuotermHost minWidth={280} maxWidth={360} />
+        <button type="button">Source action</button>
+      </div>,
+    );
+
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+    clickSource().getBoundingClientRect = () =>
+      ({ left: 40, right: 120, top: 100, bottom: 132, width: 80, height: 32, x: 40, y: 100, toJSON: () => ({}) }) as DOMRect;
+
+    act(() => {
+      quoterm({ source: clickSource(), title: "Wide enough", duration: 0 });
+    });
+
+    const slot = screen.getByRole("status").parentElement;
+    expect(slot?.getAttribute("style") ?? "").toMatch(/width:\s*280px/i);
+    expect(slot?.getAttribute("style") ?? "").toMatch(/left:\s*16px/i);
+  });
+
+
+  it("scales inline feedback width from the source width by default", () => {
+    render(
+      <div>
+        <QuotermHost />
+        <button type="button">Source action</button>
+      </div>,
+    );
+
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+    clickSource().getBoundingClientRect = () =>
+      ({ left: 100, right: 220, top: 100, bottom: 132, width: 120, height: 32, x: 100, y: 100, toJSON: () => ({}) }) as DOMRect;
+
+    act(() => {
+      quoterm({ source: clickSource(), title: "Scaled from source", duration: 0 });
+    });
+
+    const slot = screen.getByRole("status").parentElement;
+    expect(slot?.getAttribute("style") ?? "").toMatch(/width:\s*300px/i);
+  });
+
+  it("accepts configured inline width min, max, and source scale", () => {
+    render(
+      <div>
+        <QuotermHost inlineWidth={{ min: 280, max: 420, sourceScale: 2.5 }} />
+        <button type="button">Source action</button>
+      </div>,
+    );
+
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+    clickSource().getBoundingClientRect = () =>
+      ({ left: 200, right: 400, top: 100, bottom: 132, width: 200, height: 32, x: 200, y: 100, toJSON: () => ({}) }) as DOMRect;
+
+    act(() => {
+      quoterm({ source: clickSource(), title: "Configured scaling", duration: 0 });
+    });
+
+    const slot = screen.getByRole("status").parentElement;
+    expect(slot?.getAttribute("style") ?? "").toMatch(/width:\s*420px/i);
+  });
+
+  it("clamps configured inline width to narrow viewports", () => {
+    render(
+      <div>
+        <QuotermHost gutter={16} inlineWidth={{ min: 280, max: 420, sourceScale: 2.5 }} />
+        <button type="button">Source action</button>
+      </div>,
+    );
+
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 300 });
+    clickSource().getBoundingClientRect = () =>
+      ({ left: 40, right: 120, top: 100, bottom: 132, width: 80, height: 32, x: 40, y: 100, toJSON: () => ({}) }) as DOMRect;
+
+    act(() => {
+      quoterm({ source: clickSource(), title: "Viewport clamped", duration: 0 });
+    });
+
+    const slot = screen.getByRole("status").parentElement;
+    expect(slot?.getAttribute("style") ?? "").toMatch(/width:\s*268px/i);
+    expect(slot?.getAttribute("style") ?? "").toMatch(/left:\s*16px/i);
   });
 
   it("keeps a minimal fallback only when no source element is available", () => {

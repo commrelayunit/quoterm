@@ -7,7 +7,7 @@
 
 Quoted terminal-style inline feedback for React — a compact alternative to detached toast popups.
 
-Quoterm is for messages that should stay near the thing they explain: CLI-style command results, form feedback, generated citations, background task status, import warnings, and other “this happened here” UI moments. Toasts float away from context; with a `source` element, Quoterm renders a fixed-position banner anchored to that element — spanning its full width, with no layout shift.
+Quoterm is for messages that should stay near the thing they explain: CLI-style command results, form feedback, generated citations, background task status, import warnings, and other “this happened here” UI moments. Toasts float away from context; with a `source` element, Quoterm renders a fixed-position banner anchored to that element — centered on the source and widened when small controls would otherwise make the message awkward, with no layout shift.
 
 ## Installation
 
@@ -105,9 +105,11 @@ interface QuotermInput {
   command?: string;
   source?: QuotermSource;
   sourceRect?: DOMRect | null;
-  /** Positive ms auto-dismisses; undefined, null, or 0 persists until dismissed. */
+  /** Positive ms auto-dismisses; null or 0 persists. Undefined uses the variant default. */
   duration?: number | null;
   className?: string;
+  /** Optional per-item minimum width for source-bound and fallback feedback. */
+  minWidth?: number;
   style?: React.CSSProperties;
   dismissLabel?: string;
   placement?: QuotermPlacement;
@@ -126,6 +128,14 @@ interface QuotermHostProps {
   maxItems?: number;
   gutter?: number;
   maxWidth?: number;
+  /** Shorthand for inlineWidth.min; defaults to 280. */
+  minWidth?: number;
+  inlineWidth?: {
+    min?: number;
+    max?: number;
+    /** Multiplies the source width before clamping; defaults to 2.5. */
+    sourceScale?: number;
+  };
   zIndex?: number;
   /** Defaults to 'auto', following prefers-color-scheme. */
   theme?: QuotermTheme;
@@ -164,13 +174,14 @@ quoterm({
 });
 ```
 
-Quoterm keeps live element references when possible and inserts a small DOM slot immediately before/above the source element by default. Set `placement: 'after'`, `'bottom'`, or `'below'` to insert the slot immediately after/below the source instead. `placement: 'before'`, `'top'`, `'above'`, and `'auto'` all preserve the default before/above behavior. Both source-bound placements scroll naturally in document flow instead of behaving like a detached overlay, tooltip, or popover. If no source element is available, it falls back to a minimal fixed quote near the upper right of the viewport. Source-bound inline insertion is the primary mode.
+Quoterm keeps live element references when possible and inserts a small DOM slot immediately before/above the source element by default. Set `placement: 'after'`, `'bottom'`, or `'below'` to insert the slot immediately after/below the source instead. `placement: 'before'`, `'top'`, `'above'`, and `'auto'` all preserve the default before/above behavior. Both source-bound placements stay visually tied to the source element while avoiding tiny button-width banners: the host starts from the source width, applies `inlineWidth.sourceScale` (default `2.5`), then clamps between `inlineWidth.min` / `minWidth` (default `280`) and `inlineWidth.max` / `maxWidth` (default `360`) without overflowing the viewport gutter. The result is centered over the source. Individual calls can override the minimum with `quoterm({ minWidth: 320, ... })`; hosts can tune the policy with `<QuotermHost inlineWidth={{ min: 280, max: 420, sourceScale: 2.5 }} />`. If no source element is available, it falls back to a minimal fixed quote near the upper right of the viewport. Source-bound inline insertion is the primary mode.
 
 ## Dismissal and duration
 
 ```tsx
+const defaultSuccess = quoterm({ variant: 'success', title: 'Saved' }); // fades after 4s
 const persistent = quoterm({ title: 'Fix the highlighted field', duration: 0 });
-const alsoPersistent = quoterm({ title: 'Review this warning' });
+const alsoPersistent = quoterm({ variant: 'warning', title: 'Review this warning' });
 const timed = quoterm({ title: 'Index refresh queued', duration: 6000 });
 
 timed.update({ message: 'Worker accepted the job.' });
@@ -179,7 +190,7 @@ persistent.dismiss();
 dismissQuoterm(); // dismiss all
 ```
 
-`duration` is intentionally explicit: positive numbers auto-dismiss after that many milliseconds; `undefined`, `null`, and `0` keep the quote persistent until the close button or returned `dismiss()` handler is used. Persistent inline feedback is usually better for errors and warnings; short success confirmations often work well with a positive duration.
+`duration` is variant-aware by default: success auto-dismisses after 4 seconds and info after 6 seconds. Warnings and errors persist until the close button or returned `dismiss()` handler is used. Pass a positive number to override the timeout, or pass `null` / `0` to force any variant to persist.
 
 ## Themes and styling customization
 
