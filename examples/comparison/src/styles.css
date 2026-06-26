@@ -1,8 +1,8 @@
 :root {
-  color: #172033;
-  background: #f8fafc;
+  color: hsl(0 0% 95%);
+  background: hsl(240 6% 6%);
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    "Plus Jakarta Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   line-height: 1.5;
   text-rendering: optimizeLegibility;
@@ -16,24 +16,28 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  background: #f8fafc;
+  background:
+    radial-gradient(circle at top left, hsl(262 83% 65% / 0.1), transparent 28rem),
+    radial-gradient(circle at top right, hsl(199 89% 55% / 0.08), transparent 24rem),
+    hsl(240 6% 6%);
 }
 
 main {
-  width: min(860px, calc(100vw - 2rem));
+  width: min(1180px, calc(100vw - 2rem));
   margin: 0 auto;
-  padding: 2.5rem 0 4rem;
+  padding: 4rem 0 6rem;
 }
 
-header,
-.example-row {
-  border: 1px solid #d7dde8;
-  border-radius: 0.75rem;
-  background: #ffffff;
+.hero,
+.scenario-card {
+  border: 1px solid hsl(240 5% 18%);
+  border-radius: 1rem;
+  background: hsl(240 6% 9% / 0.9);
 }
 
-header {
-  padding: 1.5rem;
+.hero {
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+  margin-bottom: 1rem;
 }
 
 h1,
@@ -43,119 +47,144 @@ p {
 }
 
 h1 {
-  margin-bottom: 0.5rem;
-  font-size: clamp(1.75rem, 4vw, 2.4rem);
-  line-height: 1.1;
+  max-width: 820px;
+  margin: 0.35rem 0 1rem;
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  line-height: 1.05;
+  letter-spacing: -0.04em;
 }
 
 h2 {
   margin-bottom: 0.35rem;
   font-size: 1rem;
+  letter-spacing: -0.02em;
 }
 
 p {
-  color: #475569;
+  color: hsl(240 5% 55%);
 }
 
-.sample-line {
-  margin-bottom: 0;
-  border-left: 3px solid #64748b;
-  color: #0f172a;
+.eyebrow {
+  margin: 0 0 0.5rem;
+  color: hsl(142 76% 55%);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  padding-left: 0.75rem;
-}
-
-.toolbar,
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.toolbar {
-  margin-top: 1rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
 .playground-controls {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin-top: 1rem;
+  grid-template-columns: repeat(3, minmax(0, auto));
+  gap: 0.65rem;
+  margin-top: 1.25rem;
 }
 
 .playground-controls label {
   display: grid;
   gap: 0.25rem;
-  color: #334155;
-  font-size: 0.85rem;
-  font-weight: 650;
+  color: hsl(240 5% 55%);
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
-.playground-controls select,
-.playground-controls input {
-  width: 100%;
-  border: 1px solid #cbd5e1;
+.playground-controls select {
+  border: 1px solid hsl(240 5% 18%);
   border-radius: 0.45rem;
-  background: #ffffff;
-  color: #0f172a;
+  background: hsl(240 6% 6%);
+  color: hsl(0 0% 95%);
   font: inherit;
-  padding: 0.5rem 0.6rem;
+  padding: 0.45rem 0.6rem;
+  cursor: pointer;
 }
 
-.playground-controls select:focus-visible,
-.playground-controls input:focus-visible {
-  outline: 3px solid #93c5fd;
+.playground-controls select:focus-visible {
+  outline: 2px solid hsl(262 83% 65% / 0.6);
   outline-offset: 2px;
 }
 
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+}
+
 button {
-  border: 1px solid #1f2937;
-  border-radius: 0.45rem;
-  background: #1f2937;
-  color: #ffffff;
+  border: 1px solid hsl(262 83% 65% / 0.35);
+  border-radius: 999px;
+  background: hsl(240 6% 9%);
+  color: hsl(0 0% 95%);
   cursor: pointer;
   font: inherit;
   font-weight: 650;
-  padding: 0.55rem 0.8rem;
+  padding: 0.55rem 1rem;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
 }
 
 button:hover {
-  background: #111827;
+  border-color: hsl(262 83% 65% / 0.75);
+  background: hsl(240 6% 12%);
 }
 
 button:focus-visible {
-  outline: 3px solid #93c5fd;
+  outline: 2px solid hsl(262 83% 65% / 0.5);
   outline-offset: 2px;
 }
 
 button.secondary {
-  border-color: #cbd5e1;
-  background: #ffffff;
-  color: #1f2937;
+  border-color: hsl(240 5% 18%);
 }
 
 button.secondary:hover {
-  background: #f1f5f9;
+  border-color: hsl(240 5% 35%);
 }
 
-.examples {
+button.compare {
+  border-color: hsl(24 95% 58% / 0.45);
+  background: hsl(24 95% 15% / 0.4);
+}
+
+button.compare:hover {
+  border-color: hsl(24 95% 58% / 0.8);
+}
+
+.scenario-grid {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
-  margin-top: 1rem;
 }
 
-.example-row {
+.scenario-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
   gap: 1rem;
-  padding: 1rem;
+  padding: 1.35rem;
 }
 
+.scenario-info p:not(.eyebrow) {
+  margin: 0;
+  color: hsl(240 5% 55%);
+  font-size: 0.9rem;
+}
 
-@media (max-width: 720px) {
-  .playground-controls,
-  .example-row {
+.button-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.button-grid button {
+  flex: 1 1 8rem;
+  font-size: 0.82rem;
+  padding: 0.45rem 0.75rem;
+}
+
+@media (max-width: 820px) {
+  .scenario-grid,
+  .playground-controls {
     grid-template-columns: 1fr;
   }
 }

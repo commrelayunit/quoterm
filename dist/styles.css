@@ -1,15 +1,5 @@
-.quoterm-inline-slot {
-  display: block;
-  width: fit-content;
-  max-width: min(100%, 36rem);
-}
-
-.quoterm-inline-slot[data-quoterm-placement="before"] {
-  margin: 0 0 0.35rem;
-}
-
-.quoterm-inline-slot[data-quoterm-placement="after"] {
-  margin: 0.35rem 0 0;
+.quoterm-inline-root {
+  pointer-events: auto;
 }
 
 .quoterm-fallback-root {
@@ -38,42 +28,108 @@
 }
 
 .quoterm[data-theme="dark"] {
-  --quoterm-bg: #020617;
-  --quoterm-fg: #f8fafc;
+  --quoterm-bg: hsl(240 6% 9%);
+  --quoterm-fg: hsl(0 0% 95%);
 }
 
 @media (prefers-color-scheme: dark) {
   .quoterm[data-theme="auto"] {
-    --quoterm-bg: #020617;
-    --quoterm-fg: #f8fafc;
+    --quoterm-bg: hsl(240 6% 9%);
+    --quoterm-fg: hsl(0 0% 95%);
   }
 }
 
+/* Inline banner — light (default), placement "before" (above source) */
+.quoterm-inline-root .quoterm {
+  width: 100%;
+  border: 1px solid hsl(240 5% 88%);
+  border-top: 3px solid var(--quoterm-border);
+  border-radius: 0.5rem;
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 2px 8px hsl(240 6% 6% / 0.08);
+  padding: 0.5rem 0.6rem 0.5rem 0.75rem;
+}
+
+/* Placement "after" (below source): accent border on bottom instead */
+.quoterm-inline-root[data-quoterm-placement="after"] .quoterm {
+  border-top: 1px solid hsl(240 5% 88%);
+  border-bottom: 3px solid var(--quoterm-border);
+}
+
+/* Inline banner — dark */
+.quoterm-inline-root .quoterm[data-theme="dark"] {
+  --quoterm-muted: var(--quoterm-border);
+  background: hsl(240 6% 9%);
+  color: hsl(0 0% 95%);
+  border-right-color: hsl(240 5% 18%);
+  border-bottom-color: hsl(240 5% 18%);
+  border-left-color: hsl(240 5% 18%);
+  box-shadow: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .quoterm-inline-root .quoterm[data-theme="auto"] {
+    --quoterm-muted: var(--quoterm-border);
+    background: hsl(240 6% 9%);
+    color: hsl(0 0% 95%);
+    border-right-color: hsl(240 5% 18%);
+    border-bottom-color: hsl(240 5% 18%);
+    border-left-color: hsl(240 5% 18%);
+    box-shadow: none;
+  }
+}
+
+/* "after" + dark: restore accent on bottom, subtle on top */
+.quoterm-inline-root[data-quoterm-placement="after"] .quoterm[data-theme="dark"] {
+  border-top-color: hsl(240 5% 18%);
+  border-bottom-color: var(--quoterm-border);
+}
+
+@media (prefers-color-scheme: dark) {
+  .quoterm-inline-root[data-quoterm-placement="after"] .quoterm[data-theme="auto"] {
+    border-top-color: hsl(240 5% 18%);
+    border-bottom-color: var(--quoterm-border);
+  }
+}
+
+/* Fallback (no source element — floats in corner) */
 .quoterm-fallback-root .quoterm {
   border-radius: 0.35rem;
-  background: rgb(255 255 255 / 0.96);
-  box-shadow: 0 4px 14px rgb(15 23 42 / 0.12);
+  background: rgb(255 255 255 / 0.97);
+  box-shadow: 0 4px 14px hsl(240 6% 6% / 0.12);
   padding: 0.45rem 0.55rem 0.45rem 0.65rem;
 }
 
+.quoterm-fallback-root .quoterm[data-theme="dark"] {
+  background: hsl(240 6% 9%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .quoterm-fallback-root .quoterm[data-theme="auto"] {
+    background: hsl(240 6% 9%);
+  }
+}
+
+/* Variant colors — RefHub neon palette */
 .quoterm--success {
-  --quoterm-muted: #16a34a;
-  --quoterm-border: #22c55e;
+  --quoterm-muted: hsl(142 71% 38%);
+  --quoterm-border: hsl(142 76% 55%);
 }
 
 .quoterm--warning {
-  --quoterm-muted: #ea580c;
-  --quoterm-border: #f97316;
+  --quoterm-muted: hsl(24 95% 42%);
+  --quoterm-border: hsl(24 95% 58%);
 }
 
 .quoterm--error {
-  --quoterm-muted: #dc2626;
-  --quoterm-border: #ef4444;
+  --quoterm-muted: hsl(0 72% 38%);
+  --quoterm-border: hsl(0 72% 51%);
 }
 
 .quoterm--info {
-  --quoterm-muted: #2563eb;
-  --quoterm-border: #3b82f6;
+  --quoterm-muted: hsl(199 89% 38%);
+  --quoterm-border: hsl(199 89% 55%);
 }
 
 .quoterm__row {
@@ -135,18 +191,13 @@
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: #64748b;
+  color: inherit;
   cursor: pointer;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   line-height: 1;
-  opacity: 0.78;
+  opacity: 0.65;
   padding: 0.18rem 0.28rem;
-}
-
-.quoterm__dismiss:hover {
-  color: #111827;
-  opacity: 1;
 }
 
 .quoterm__dismiss:focus-visible {

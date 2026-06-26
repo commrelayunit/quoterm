@@ -7,7 +7,7 @@
 
 Quoted terminal-style inline feedback for React — a compact alternative to detached toast popups.
 
-Quoterm is for messages that should stay near the thing they explain: CLI-style command results, form feedback, generated citations, background task status, import warnings, and other “this happened here” UI moments. Toasts float away from context; with a `source` element, Quoterm inserts a real inline DOM quote before/above or after/below that source in normal document flow.
+Quoterm is for messages that should stay near the thing they explain: CLI-style command results, form feedback, generated citations, background task status, import warnings, and other “this happened here” UI moments. Toasts float away from context; with a `source` element, Quoterm renders a fixed-position banner anchored to that element — spanning its full width, with no layout shift.
 
 > Status: public package skeleton is ready, but **not published to npm yet**. Do not rely on `npm install quoterm` until the first release is explicitly published.
 
@@ -64,38 +64,33 @@ export function App() {
 
 ## Visual examples
 
-Final screenshots/GIFs are not included yet. These placeholders mark the exact media the project should capture before or shortly after the first public release; they are intentionally not fabricated.
+### Feedback anchored to the source — no layout shift
 
-### Inserted above the clicked control
+![Quoterm inline banners appearing above scenario cards in dark mode](docs/media/quoterm-inline-banner.gif)
 
-> **Media slot:** Screenshot/GIF showing a user clicking a button and a compact Quoterm line (`> success: Saved`) inserted immediately above that same control in normal page flow.
->
-> Suggested filename: `docs/media/quoterm-inline-control.gif`
+Each banner appears as a fixed overlay above (or below) the element that triggered it. No toasts, no layout shift, no detached corners — the feedback stays where the action happened.
 
-### Success, warning, and error variants
+### All four variants
 
-> **Media slot:** Screenshot showing the default `success`, `warning`, and `error` variants together, with readable contrast and visible dismiss controls.
->
-> Suggested filename: `docs/media/quoterm-variants.png`
+![Success, warning, error, and info variants in dark mode](docs/media/quoterm-variants-dark.png)
 
-### Inline quote versus a traditional corner toast
+Variants in dark mode. The same four variants in light mode:
 
-> **Media slot:** Side-by-side screenshot/GIF contrasting a contextual Quoterm quote near the source with a detached lower-corner toast.
->
-> Suggested filename: `docs/media/quoterm-vs-toast.gif`
+![Success, warning, error, and info variants in light mode](docs/media/quoterm-variants-light.png)
 
-A runnable comparison playground lives in [`examples/comparison`](examples/comparison/README.md). It is a plain page with one interactive example each for success, warning, error, and info, plus small controls for placement, theme, duration, and max visible items. Each Quoterm result is inserted near the clicked control as a compact inline quote (`> severity: message`) with a left border; there are no toast comparison controls in the primary rows, so the Quoterm behavior is unambiguous.
+### Quoterm versus corner toasts
 
-Run it separately from the package root:
+![Quoterm contextual banner vs react-hot-toast, Sonner, and React-Toastify corner notifications](docs/media/quoterm-vs-toast.gif)
+
+The Quoterm banner appears anchored to the card that triggered it (top border, spanning full card width). The corner toasts from react-hot-toast (top-right), Sonner, and React-Toastify (bottom) float detached from context.
+
+A runnable interactive comparison lives in [`examples/comparison`](examples/comparison/README.md) — click "Quoterm", "react-hot-toast", "Sonner", "React-Toastify", or "Compare all" per scenario. Controls let you tune placement, theme, and duration without touching source.
 
 ```sh
-npm install
 cd examples/comparison
 npm install
 npm run dev
 ```
-
-The example app intentionally stays lightweight. Installing or publishing the `quoterm` package remains limited to React peer dependencies; demo-only dependencies must not be added to the root package runtime or peer dependencies.
 
 ## API
 
