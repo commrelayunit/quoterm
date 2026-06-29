@@ -11,6 +11,7 @@ export type {
   QuotermHostProps,
   QuotermInput,
   QuotermPlacement,
+  QuotermRenderMode,
   QuotermSource,
   QuotermState,
   QuotermTheme,

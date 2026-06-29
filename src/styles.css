@@ -2,6 +2,10 @@
   pointer-events: auto;
 }
 
+.quoterm-inline-root[data-quoterm-render-mode="inline"] {
+  margin: 6px 0;
+}
+
 .quoterm-fallback-root {
   position: fixed;
   pointer-events: none;

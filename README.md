@@ -5,9 +5,9 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-ready-3178c6)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.2%2B%20%7C%2019-61dafb)](https://react.dev/)
 
-Quoted terminal-style inline feedback for React — a compact alternative to detached toast popups.
+Quoted terminal-style contextual feedback for React — a compact alternative to detached toast popups.
 
-Quoterm is for messages that should stay near the thing they explain: CLI-style command results, form feedback, generated citations, background task status, import warnings, and other “this happened here” UI moments. Toasts float away from context; with a `source` element, Quoterm renders a fixed-position banner anchored to that element — centered on the source and widened when small controls would otherwise make the message awkward, with no layout shift.
+Quoterm is for messages that should stay near the thing they explain: CLI-style command results, form feedback, generated citations, background task status, import warnings, and other “this happened here” UI moments. Toasts float away from context; with a `source` element, Quoterm can render either a fixed-position overlay anchored to that element with no layout shift, or true inline feedback inserted into document flow before or after the source.
 
 ## Installation
 
@@ -54,11 +54,11 @@ export function App() {
 
 ## Visual examples
 
-### Feedback anchored to the source — no layout shift
+### Feedback anchored to the source — overlay mode
 
 ![Quoterm inline banners appearing above scenario cards in dark mode](docs/media/quoterm-inline-banner.gif)
 
-Each banner appears as a fixed overlay above (or below) the element that triggered it. No toasts, no layout shift, no detached corners — the feedback stays where the action happened.
+By default, each banner appears as a fixed overlay above (or below) the element that triggered it. No toasts, no layout shift, no detached corners — the feedback stays where the action happened.
 
 ### All four variants
 
@@ -93,6 +93,7 @@ type QuotermVariant = 'success' | 'warning' | 'error' | 'info';
 type QuotermPlacement = 'auto' | 'top' | 'bottom' | 'before' | 'after' | 'above' | 'below';
 type QuotermTheme = 'light' | 'dark' | 'auto';
 type QuotermSource = EventTarget | Element | React.RefObject<Element | null> | DOMRect | null;
+type QuotermRenderMode = 'overlay' | 'inline';
 
 interface QuotermInput {
   id?: string;
@@ -120,7 +121,7 @@ interface QuotermInput {
 
 ### `QuotermHost(props)`
 
-Renders active feedback. When an item has a source element, the host creates a small inline slot before or after that element and portals the quote into that slot, so it participates in normal document flow. Add one host per app or per bounded surface.
+Renders active feedback. When an item has a source element, the host uses `renderMode` to decide how it should attach to that source. Add one host per app or per bounded surface.
 
 ```ts
 interface QuotermHostProps {
@@ -139,6 +140,10 @@ interface QuotermHostProps {
   zIndex?: number;
   /** Defaults to 'auto', following prefers-color-scheme. */
   theme?: QuotermTheme;
+  /** Defaults to 'overlay' for backward-compatible fixed anchored feedback. */
+  renderMode?: QuotermRenderMode;
+  /** Set false to hide `$ command`, `>`, and severity prefix chrome. */
+  showCommandChrome?: boolean;
   portalTarget?: Element | DocumentFragment | null;
   renderIcon?: (variant: QuotermVariant) => React.ReactNode;
   formatCommand?: (variant: QuotermVariant, item: QuotermState) => string;
@@ -174,7 +179,13 @@ quoterm({
 });
 ```
 
-Quoterm keeps live element references when possible and inserts a small DOM slot immediately before/above the source element by default. Set `placement: 'after'`, `'bottom'`, or `'below'` to insert the slot immediately after/below the source instead. `placement: 'before'`, `'top'`, `'above'`, and `'auto'` all preserve the default before/above behavior. Both source-bound placements stay visually tied to the source element while avoiding tiny button-width banners: the host starts from the source width, applies `inlineWidth.sourceScale` (default `2.5`), then clamps between `inlineWidth.min` / `minWidth` (default `280`) and `inlineWidth.max` / `maxWidth` (default `360`) without overflowing the viewport gutter. The result is centered over the source. Individual calls can override the minimum with `quoterm({ minWidth: 320, ... })`; hosts can tune the policy with `<QuotermHost inlineWidth={{ min: 280, max: 420, sourceScale: 2.5 }} />`. If no source element is available, it falls back to a minimal fixed quote near the upper right of the viewport. Source-bound inline insertion is the primary mode.
+Quoterm keeps live element references when possible. By default, `<QuotermHost />` uses `renderMode="overlay"`: source-bound feedback is portaled to the page, positioned with `position: fixed`, and anchored just above or below the source without moving layout. Set `placement: 'after'`, `'bottom'`, or `'below'` to anchor it below the source; `placement: 'before'`, `'top'`, `'above'`, and `'auto'` preserve the default before/above behavior.
+
+Use `<QuotermHost renderMode="inline" />` when feedback should become part of the component layout. In inline mode, Quoterm creates a real DOM slot immediately before/above the source element by default, or immediately after/below it for `placement: 'after'`, `'bottom'`, or `'below'`. The slot does not use fixed positioning, viewport `left`/`top`, or overlay stacking, so surrounding content can move naturally around the feedback.
+
+Both source-bound modes avoid tiny button-width banners: the host starts from the source width, applies `inlineWidth.sourceScale` (default `2.5`), then clamps between `inlineWidth.min` / `minWidth` (default `280`) and `inlineWidth.max` / `maxWidth` (default `360`) without overflowing the viewport gutter. Individual calls can override the minimum with `quoterm({ minWidth: 320, ... })`; hosts can tune the policy with `<QuotermHost inlineWidth={{ min: 280, max: 420, sourceScale: 2.5 }} />`. If no source element is available, it falls back to a minimal fixed quote near the upper right of the viewport.
+
+Set `<QuotermHost showCommandChrome={false} />` when the host application should provide feedback without terminal chrome. The item still renders its icon, title, message, description, role, and aria-live behavior, but omits `$ command`, the `>` prompt, and the visible severity prefix such as `error:`.
 
 ## Dismissal and duration
 
@@ -224,7 +235,8 @@ The package marks CSS as a side effect so bundlers do not accidentally tree-shak
 - `warning` and `error` default to `role="alert"` and `aria-live="assertive"`.
 - Dismiss buttons include a configurable accessible label.
 - `aria-atomic="true"` is applied to each feedback item.
-- Source-bound feedback is inserted immediately before/above or after/below its source in document flow, preserving context better than detached global toasts.
+- Source-bound feedback defaults to fixed overlay anchoring for no-layout-shift status messages.
+- Use `renderMode="inline"` when assistive context should be inserted immediately before/above or after/below its source in document flow.
 - Keep message text concise and actionable; do not use Quoterm for long logs.
 
 ## Why not a toast?
