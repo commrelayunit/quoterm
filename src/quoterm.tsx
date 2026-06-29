@@ -5,7 +5,7 @@ export type QuotermVariant = "success" | "warning" | "error" | "info";
 export type QuotermPlacement = "auto" | "top" | "bottom" | "before" | "after" | "above" | "below";
 export type QuotermTheme = "light" | "dark" | "auto";
 export type QuotermSource = EventTarget | Element | React.RefObject<Element | null> | DOMRect | null;
-export type QuotermRenderMode = "overlay" | "inline";
+export type QuotermRenderMode = "overlay" | "inline" | "adjacent";
 
 export interface QuotermInput {
   title?: React.ReactNode;
@@ -61,6 +61,7 @@ export interface QuotermHostProps {
   /**
    * overlay preserves the fixed-position anchored behavior with no layout shift.
    * inline inserts source-bound feedback before/after its source in document flow.
+   * adjacent keeps source layout stable and places feedback beside the source.
    * Defaults to overlay for backward compatibility.
    */
   renderMode?: QuotermRenderMode;
@@ -490,6 +491,101 @@ function OverlayQuotermPortal({
   );
 }
 
+function AdjacentQuotermPortal({
+  item,
+  theme,
+  zIndex,
+  maxWidth,
+  minWidth,
+  inlineWidth,
+  gutter,
+  showCommandChrome,
+  renderIcon,
+  formatCommand,
+}: {
+  item: QuotermState;
+  theme: QuotermTheme;
+  zIndex: number;
+  maxWidth: number;
+  minWidth: number;
+  inlineWidth: QuotermInlineWidthOptions | undefined;
+  gutter: number;
+  showCommandChrome: boolean;
+  renderIcon: ((variant: QuotermVariant) => React.ReactNode) | undefined;
+  formatCommand: (variant: QuotermVariant, item: QuotermState) => string;
+}) {
+  const [rect, setRect] = React.useState<DOMRect | null>(null);
+
+  React.useLayoutEffect(() => {
+    const el = item.sourceElement;
+    if (!el || typeof window === "undefined") return;
+
+    let frame: number | null = null;
+    const update = () => {
+      frame = null;
+      setRect(el.getBoundingClientRect());
+    };
+    const scheduleUpdate = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(update);
+    };
+
+    update();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true, capture: true });
+    window.addEventListener("resize", scheduleUpdate, { passive: true });
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            scheduleUpdate();
+          });
+    resizeObserver?.observe(el);
+
+    return () => {
+      window.removeEventListener("scroll", scheduleUpdate, true);
+      window.removeEventListener("resize", scheduleUpdate);
+      resizeObserver?.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [item.sourceElement]);
+
+  if (!rect || typeof document === "undefined") return null;
+
+  const placement = getInlinePlacement(item.placement);
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : maxWidth + gutter * 2;
+  const widthOptions: QuotermInlineWidthOptions = { ...inlineWidth };
+  if (item.minWidth !== undefined) widthOptions.min = item.minWidth;
+  const inlineSize = getInlineSize(rect, widthOptions, minWidth, maxWidth, viewportWidth, gutter);
+  const leftSpace = rect.left - gutter - INLINE_GAP;
+  const rightSpace = viewportWidth - rect.right - gutter - INLINE_GAP;
+  const prefersAfter = placement === "after";
+  const useRight = prefersAfter ? rightSpace >= inlineSize.width || rightSpace >= leftSpace : !(leftSpace >= inlineSize.width || leftSpace >= rightSpace);
+  const preferredLeft = useRight ? rect.right + INLINE_GAP : rect.left - inlineSize.width - INLINE_GAP;
+  const left = Math.min(Math.max(gutter, preferredLeft), Math.max(gutter, viewportWidth - inlineSize.width - gutter));
+
+  return createPortal(
+    <div
+      className="quoterm-inline-root quoterm-inline-slot quoterm-adjacent-slot"
+      data-quoterm="inline-slot"
+      data-quoterm-slot="inline"
+      data-quoterm-placement={useRight ? "after" : "before"}
+      data-quoterm-render-mode="adjacent"
+      style={{ position: "fixed", left, top: rect.top + rect.height / 2, width: inlineSize.width, zIndex, transform: "translateY(-50%)" }}
+    >
+      <QuotermItem
+        item={item}
+        theme={theme}
+        width={inlineSize.width}
+        showCommandChrome={showCommandChrome}
+        renderIcon={renderIcon}
+        formatCommand={formatCommand}
+      />
+    </div>,
+    document.body,
+  );
+}
+
 function InlineQuotermPortal({
   item,
   theme,
@@ -667,6 +763,20 @@ export function QuotermHost({
               key={item.id}
               item={item}
               theme={itemTheme}
+              maxWidth={maxWidth}
+              minWidth={inlineWidth?.min ?? minWidth}
+              inlineWidth={inlineWidth ?? DEFAULT_INLINE_WIDTH}
+              gutter={gutter}
+              showCommandChrome={showCommandChrome}
+              renderIcon={renderIcon}
+              formatCommand={formatCommand}
+            />
+          ) : renderMode === "adjacent" ? (
+            <AdjacentQuotermPortal
+              key={item.id}
+              item={item}
+              theme={itemTheme}
+              zIndex={zIndex}
               maxWidth={maxWidth}
               minWidth={inlineWidth?.min ?? minWidth}
               inlineWidth={inlineWidth ?? DEFAULT_INLINE_WIDTH}

@@ -93,7 +93,7 @@ type QuotermVariant = 'success' | 'warning' | 'error' | 'info';
 type QuotermPlacement = 'auto' | 'top' | 'bottom' | 'before' | 'after' | 'above' | 'below';
 type QuotermTheme = 'light' | 'dark' | 'auto';
 type QuotermSource = EventTarget | Element | React.RefObject<Element | null> | DOMRect | null;
-type QuotermRenderMode = 'overlay' | 'inline';
+type QuotermRenderMode = 'overlay' | 'inline' | 'adjacent';
 
 interface QuotermInput {
   id?: string;
@@ -183,6 +183,8 @@ Quoterm keeps live element references when possible. By default, `<QuotermHost /
 
 Use `<QuotermHost renderMode="inline" />` when feedback should become part of the component layout. In inline mode, Quoterm creates a real DOM slot immediately before/above the source element by default, or immediately after/below it for `placement: 'after'`, `'bottom'`, or `'below'`. The slot does not use fixed positioning, viewport `left`/`top`, or overlay stacking, so surrounding content can move naturally around the feedback.
 
+Use `<QuotermHost renderMode="adjacent" />` when feedback should feel attached to the source's row but must not move the source control. Adjacent mode keeps the source element and its DOM siblings in place, then positions the feedback beside the source with the same clamped width policy. It is useful for action bars where shifting Save, Sync, or menu buttons would feel jumpy.
+
 Both source-bound modes avoid tiny button-width banners: the host starts from the source width, applies `inlineWidth.sourceScale` (default `2.5`), then clamps between `inlineWidth.min` / `minWidth` (default `280`) and `inlineWidth.max` / `maxWidth` (default `360`) without overflowing the viewport gutter. Individual calls can override the minimum with `quoterm({ minWidth: 320, ... })`; hosts can tune the policy with `<QuotermHost inlineWidth={{ min: 280, max: 420, sourceScale: 2.5 }} />`. If no source element is available, it falls back to a minimal fixed quote near the upper right of the viewport.
 
 Set `<QuotermHost showCommandChrome={false} />` when the host application should provide feedback without terminal chrome. The item still renders its icon, title, message, description, role, and aria-live behavior, but omits `$ command`, the `>` prompt, and the visible severity prefix such as `error:`.
@@ -237,6 +239,7 @@ The package marks CSS as a side effect so bundlers do not accidentally tree-shak
 - `aria-atomic="true"` is applied to each feedback item.
 - Source-bound feedback defaults to fixed overlay anchoring for no-layout-shift status messages.
 - Use `renderMode="inline"` when assistive context should be inserted immediately before/above or after/below its source in document flow.
+- Use `renderMode="adjacent"` when feedback should stay beside a control without shifting that control.
 - Keep message text concise and actionable; do not use Quoterm for long logs.
 
 ## Why not a toast?

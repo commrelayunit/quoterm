@@ -375,6 +375,83 @@ function OverlayQuotermPortal({
     document.body
   );
 }
+function AdjacentQuotermPortal({
+  item,
+  theme,
+  zIndex,
+  maxWidth,
+  minWidth,
+  inlineWidth,
+  gutter,
+  showCommandChrome,
+  renderIcon,
+  formatCommand
+}) {
+  const [rect, setRect] = React.useState(null);
+  React.useLayoutEffect(() => {
+    const el = item.sourceElement;
+    if (!el || typeof window === "undefined") return;
+    let frame = null;
+    const update = () => {
+      frame = null;
+      setRect(el.getBoundingClientRect());
+    };
+    const scheduleUpdate = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", scheduleUpdate, { passive: true, capture: true });
+    window.addEventListener("resize", scheduleUpdate, { passive: true });
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
+      scheduleUpdate();
+    });
+    resizeObserver?.observe(el);
+    return () => {
+      window.removeEventListener("scroll", scheduleUpdate, true);
+      window.removeEventListener("resize", scheduleUpdate);
+      resizeObserver?.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [item.sourceElement]);
+  if (!rect || typeof document === "undefined") return null;
+  const placement = getInlinePlacement(item.placement);
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : maxWidth + gutter * 2;
+  const widthOptions = { ...inlineWidth };
+  if (item.minWidth !== void 0) widthOptions.min = item.minWidth;
+  const inlineSize = getInlineSize(rect, widthOptions, minWidth, maxWidth, viewportWidth, gutter);
+  const leftSpace = rect.left - gutter - INLINE_GAP;
+  const rightSpace = viewportWidth - rect.right - gutter - INLINE_GAP;
+  const prefersAfter = placement === "after";
+  const useRight = prefersAfter ? rightSpace >= inlineSize.width || rightSpace >= leftSpace : !(leftSpace >= inlineSize.width || leftSpace >= rightSpace);
+  const preferredLeft = useRight ? rect.right + INLINE_GAP : rect.left - inlineSize.width - INLINE_GAP;
+  const left = Math.min(Math.max(gutter, preferredLeft), Math.max(gutter, viewportWidth - inlineSize.width - gutter));
+  return (0, import_react_dom.createPortal)(
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      "div",
+      {
+        className: "quoterm-inline-root quoterm-inline-slot quoterm-adjacent-slot",
+        "data-quoterm": "inline-slot",
+        "data-quoterm-slot": "inline",
+        "data-quoterm-placement": useRight ? "after" : "before",
+        "data-quoterm-render-mode": "adjacent",
+        style: { position: "fixed", left, top: rect.top + rect.height / 2, width: inlineSize.width, zIndex, transform: "translateY(-50%)" },
+        children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          QuotermItem,
+          {
+            item,
+            theme,
+            width: inlineSize.width,
+            showCommandChrome,
+            renderIcon,
+            formatCommand
+          }
+        )
+      }
+    ),
+    document.body
+  );
+}
 function InlineQuotermPortal({
   item,
   theme,
@@ -511,6 +588,21 @@ function QuotermHost({
       {
         item,
         theme: itemTheme,
+        maxWidth,
+        minWidth: inlineWidth?.min ?? minWidth,
+        inlineWidth: inlineWidth ?? DEFAULT_INLINE_WIDTH,
+        gutter,
+        showCommandChrome,
+        renderIcon,
+        formatCommand
+      },
+      item.id
+    ) : renderMode === "adjacent" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      AdjacentQuotermPortal,
+      {
+        item,
+        theme: itemTheme,
+        zIndex,
         maxWidth,
         minWidth: inlineWidth?.min ?? minWidth,
         inlineWidth: inlineWidth ?? DEFAULT_INLINE_WIDTH,

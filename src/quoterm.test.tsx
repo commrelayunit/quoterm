@@ -112,6 +112,36 @@ describe("quoterm", () => {
     expect(slot?.getAttribute("style") ?? "").not.toMatch(/position:\s*fixed/i);
   });
 
+  it("renders adjacent feedback beside the source without moving the source element", () => {
+    render(
+      <div>
+        <span data-testid="previous-sibling">Previous sibling</span>
+        <button type="button">Source action</button>
+        <span data-testid="next-sibling">Next sibling</span>
+      </div>,
+    );
+
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+    const source = clickSource();
+    source.getBoundingClientRect = () =>
+      ({ left: 700, right: 780, top: 100, bottom: 132, width: 80, height: 32, x: 700, y: 100, toJSON: () => ({}) }) as DOMRect;
+
+    render(<QuotermHost renderMode="adjacent" />);
+
+    act(() => {
+      quoterm({ source, title: "Beside source", duration: 0 });
+    });
+
+    const feedback = screen.getByRole("status");
+    const slot = feedback.parentElement;
+    expect(slot?.dataset.quotermRenderMode).toBe("adjacent");
+    expect(slot?.dataset.quotermPlacement).toBe("before");
+    expect(source.previousElementSibling).toBe(screen.getByTestId("previous-sibling"));
+    expect(source.nextElementSibling).toBe(screen.getByTestId("next-sibling"));
+    expect(slot?.getAttribute("style") ?? "").toMatch(/position:\s*fixed/i);
+    expect(slot?.getAttribute("style") ?? "").toMatch(/transform:\s*translateY\(-50%\)/i);
+  });
+
   it("accepts bottom and below as after-placement aliases", () => {
     render(
       <div>

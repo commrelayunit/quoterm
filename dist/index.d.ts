@@ -4,7 +4,7 @@ type QuotermVariant = "success" | "warning" | "error" | "info";
 type QuotermPlacement = "auto" | "top" | "bottom" | "before" | "after" | "above" | "below";
 type QuotermTheme = "light" | "dark" | "auto";
 type QuotermSource = EventTarget | Element | React.RefObject<Element | null> | DOMRect | null;
-type QuotermRenderMode = "overlay" | "inline";
+type QuotermRenderMode = "overlay" | "inline" | "adjacent";
 interface QuotermInput {
     title?: React.ReactNode;
     message?: React.ReactNode;
@@ -54,6 +54,7 @@ interface QuotermHostProps {
     /**
      * overlay preserves the fixed-position anchored behavior with no layout shift.
      * inline inserts source-bound feedback before/after its source in document flow.
+     * adjacent keeps source layout stable and places feedback beside the source.
      * Defaults to overlay for backward compatibility.
      */
     renderMode?: QuotermRenderMode;
