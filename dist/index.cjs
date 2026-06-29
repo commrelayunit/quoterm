@@ -247,6 +247,7 @@ function QuotermItem({
   item,
   theme,
   width,
+  showCommandChrome,
   renderIcon,
   formatCommand
 }) {
@@ -268,19 +269,21 @@ function QuotermItem({
       children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "quoterm__row", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "quoterm__icon", "aria-hidden": "true", children: icon }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "quoterm__body", children: [
-          command ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "quoterm__command", children: [
+          showCommandChrome && command ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "quoterm__command", children: [
             "$ ",
             command
           ] }) : null,
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "quoterm__quote", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "quoterm__prompt", "aria-hidden": "true", children: [
-              ">",
-              " "
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "quoterm__variant", children: [
-              item.variant,
-              ": "
-            ] }),
+            showCommandChrome ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "quoterm__prompt", "aria-hidden": "true", children: [
+                ">",
+                " "
+              ] }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "quoterm__variant", children: [
+                item.variant,
+                ": "
+              ] })
+            ] }) : null,
             primary
           ] }),
           details.map((detail, index) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "quoterm__detail", children: detail }, index))
@@ -299,7 +302,7 @@ function QuotermItem({
     }
   );
 }
-function InlineQuotermPortal({
+function OverlayQuotermPortal({
   item,
   theme,
   zIndex,
@@ -307,6 +310,7 @@ function InlineQuotermPortal({
   minWidth,
   inlineWidth,
   gutter,
+  showCommandChrome,
   renderIcon,
   formatCommand
 }) {
@@ -349,15 +353,107 @@ function InlineQuotermPortal({
     /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
       "div",
       {
-        className: "quoterm-inline-root quoterm-inline-slot",
+        className: "quoterm-inline-root quoterm-inline-slot quoterm-overlay-slot",
         "data-quoterm": "inline-slot",
         "data-quoterm-slot": "inline",
         "data-quoterm-placement": placement,
+        "data-quoterm-render-mode": "overlay",
         style: { position: "fixed", left: inlineSize.left, width: inlineSize.width, zIndex, ...posStyle },
-        children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QuotermItem, { item, theme, width: inlineSize.width, renderIcon, formatCommand })
+        children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          QuotermItem,
+          {
+            item,
+            theme,
+            width: inlineSize.width,
+            showCommandChrome,
+            renderIcon,
+            formatCommand
+          }
+        )
       }
     ),
     document.body
+  );
+}
+function InlineQuotermPortal({
+  item,
+  theme,
+  maxWidth,
+  minWidth,
+  inlineWidth,
+  gutter,
+  showCommandChrome,
+  renderIcon,
+  formatCommand
+}) {
+  const placement = getInlinePlacement(item.placement);
+  const [slot, setSlot] = React.useState(null);
+  const [rect, setRect] = React.useState(null);
+  React.useLayoutEffect(() => {
+    const source = item.sourceElement;
+    const parent = source?.parentNode;
+    if (!source || !parent || typeof document === "undefined") return;
+    const nextSlot = document.createElement("div");
+    if (placement === "after") {
+      parent.insertBefore(nextSlot, source.nextSibling);
+    } else {
+      parent.insertBefore(nextSlot, source);
+    }
+    setSlot(nextSlot);
+    return () => {
+      nextSlot.remove();
+      setSlot((current) => current === nextSlot ? null : current);
+    };
+  }, [item.sourceElement, placement]);
+  React.useLayoutEffect(() => {
+    const source = item.sourceElement;
+    if (!source || typeof window === "undefined") return;
+    let frame = null;
+    const update = () => {
+      frame = null;
+      setRect(source.getBoundingClientRect());
+    };
+    const scheduleUpdate = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("resize", scheduleUpdate, { passive: true });
+    const resizeObserver = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => {
+      scheduleUpdate();
+    });
+    resizeObserver?.observe(source);
+    return () => {
+      window.removeEventListener("resize", scheduleUpdate);
+      resizeObserver?.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [item.sourceElement]);
+  if (!slot || !rect) return null;
+  const viewportWidth = typeof window !== "undefined" ? window.innerWidth : maxWidth + gutter * 2;
+  const widthOptions = { ...inlineWidth };
+  if (item.minWidth !== void 0) widthOptions.min = item.minWidth;
+  const inlineSize = getInlineSize(rect, widthOptions, minWidth, maxWidth, viewportWidth, gutter);
+  slot.className = "quoterm-inline-root quoterm-inline-slot";
+  slot.dataset.quoterm = "inline-slot";
+  slot.dataset.quotermSlot = "inline";
+  slot.dataset.quotermPlacement = placement;
+  slot.dataset.quotermRenderMode = "inline";
+  slot.style.width = `${inlineSize.width}px`;
+  slot.style.maxWidth = "100%";
+  return (0, import_react_dom.createPortal)(
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      QuotermItem,
+      {
+        item,
+        theme,
+        width: inlineSize.width,
+        showCommandChrome,
+        renderIcon,
+        formatCommand
+      }
+    ),
+    slot
   );
 }
 function FallbackQuotermPortal({
@@ -368,6 +464,7 @@ function FallbackQuotermPortal({
   minWidth,
   zIndex,
   portalTarget,
+  showCommandChrome,
   renderIcon,
   formatCommand
 }) {
@@ -375,7 +472,17 @@ function FallbackQuotermPortal({
   const target = portalTarget ?? document.body;
   const position = getDocumentPosition(item, { gutter, maxWidth, minWidth: item.minWidth ?? minWidth });
   return (0, import_react_dom.createPortal)(
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "quoterm-fallback-root", "data-quoterm": "fallback-slot", style: { top: position.top, left: position.left, zIndex }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QuotermItem, { item, theme, width: position.width, renderIcon, formatCommand }) }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "quoterm-fallback-root", "data-quoterm": "fallback-slot", style: { top: position.top, left: position.left, zIndex }, children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      QuotermItem,
+      {
+        item,
+        theme,
+        width: position.width,
+        showCommandChrome,
+        renderIcon,
+        formatCommand
+      }
+    ) }),
     target
   );
 }
@@ -388,6 +495,8 @@ function QuotermHost({
   inlineWidth,
   zIndex = 1e3,
   theme = "auto",
+  renderMode = "overlay",
+  showCommandChrome = true,
   portalTarget,
   renderIcon,
   formatCommand = defaultFormatCommand
@@ -397,8 +506,22 @@ function QuotermHost({
   if (typeof document === "undefined" || visibleItems.length === 0) return null;
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: visibleItems.map((item) => {
     const itemTheme = item.theme ?? theme;
-    const content = item.sourceElement ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+    const content = item.sourceElement ? renderMode === "inline" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
       InlineQuotermPortal,
+      {
+        item,
+        theme: itemTheme,
+        maxWidth,
+        minWidth: inlineWidth?.min ?? minWidth,
+        inlineWidth: inlineWidth ?? DEFAULT_INLINE_WIDTH,
+        gutter,
+        showCommandChrome,
+        renderIcon,
+        formatCommand
+      },
+      item.id
+    ) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      OverlayQuotermPortal,
       {
         item,
         theme: itemTheme,
@@ -407,6 +530,7 @@ function QuotermHost({
         minWidth: inlineWidth?.min ?? minWidth,
         inlineWidth: inlineWidth ?? DEFAULT_INLINE_WIDTH,
         gutter,
+        showCommandChrome,
         renderIcon,
         formatCommand
       },
@@ -421,6 +545,7 @@ function QuotermHost({
         minWidth,
         zIndex,
         portalTarget,
+        showCommandChrome,
         renderIcon,
         formatCommand
       },

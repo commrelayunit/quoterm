@@ -4,6 +4,7 @@ type QuotermVariant = "success" | "warning" | "error" | "info";
 type QuotermPlacement = "auto" | "top" | "bottom" | "before" | "after" | "above" | "below";
 type QuotermTheme = "light" | "dark" | "auto";
 type QuotermSource = EventTarget | Element | React.RefObject<Element | null> | DOMRect | null;
+type QuotermRenderMode = "overlay" | "inline";
 interface QuotermInput {
     title?: React.ReactNode;
     message?: React.ReactNode;
@@ -50,6 +51,14 @@ interface QuotermHostProps {
     inlineWidth?: QuotermInlineWidthOptions;
     zIndex?: number;
     theme?: QuotermTheme;
+    /**
+     * overlay preserves the fixed-position anchored behavior with no layout shift.
+     * inline inserts source-bound feedback before/after its source in document flow.
+     * Defaults to overlay for backward compatibility.
+     */
+    renderMode?: QuotermRenderMode;
+    /** Set false to hide terminal command, prompt, and variant prefix chrome. */
+    showCommandChrome?: boolean;
     portalTarget?: Element | DocumentFragment | null;
     renderIcon?: (variant: QuotermVariant) => React.ReactNode;
     formatCommand?: (variant: QuotermVariant, item: QuotermState) => string;
@@ -68,6 +77,6 @@ declare function useQuoterm(): {
     quoterm: typeof quoterm;
     dismiss: typeof dismissQuoterm;
 };
-declare function QuotermHost({ className, maxItems, gutter, maxWidth, minWidth, inlineWidth, zIndex, theme, portalTarget, renderIcon, formatCommand, }: QuotermHostProps): React.JSX.Element | null;
+declare function QuotermHost({ className, maxItems, gutter, maxWidth, minWidth, inlineWidth, zIndex, theme, renderMode, showCommandChrome, portalTarget, renderIcon, formatCommand, }: QuotermHostProps): React.JSX.Element | null;
 
-export { type QuotermApi, type QuotermDismiss, QuotermHost, type QuotermHostProps, type QuotermInput, type QuotermPlacement, type QuotermSnapshot, type QuotermSource, type QuotermState, type QuotermTheme, type QuotermVariant, dismissQuoterm, getQuotermsSnapshot, quoterm, useQuoterm };
+export { type QuotermApi, type QuotermDismiss, QuotermHost, type QuotermHostProps, type QuotermInput, type QuotermPlacement, type QuotermRenderMode, type QuotermSnapshot, type QuotermSource, type QuotermState, type QuotermTheme, type QuotermVariant, dismissQuoterm, getQuotermsSnapshot, quoterm, useQuoterm };

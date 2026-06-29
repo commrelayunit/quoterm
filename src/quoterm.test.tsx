@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 describe("quoterm", () => {
-  it("renders source-bound feedback immediately before the source element in DOM flow by default", () => {
+  it("renders source-bound feedback as a fixed overlay by default", () => {
     render(
       <div>
         <QuotermHost />
@@ -32,12 +32,14 @@ describe("quoterm", () => {
     expect(feedback.textContent).toContain("Changes landed.");
     expect(feedback.parentElement?.dataset.quotermSlot).toBe("inline");
     expect(feedback.parentElement?.dataset.quotermPlacement).toBe("before");
+    expect(feedback.parentElement?.dataset.quotermRenderMode).toBe("overlay");
     expect(feedback.parentElement?.classList.contains("quoterm-inline-slot")).toBe(true);
     expect(feedback.parentElement?.getAttribute("style") ?? "").toMatch(/position:\s*fixed/i);
+    expect(clickSource().previousElementSibling).toBeNull();
     expect(document.querySelector(".quoterm-fallback-root")).toBeNull();
   });
 
-  it("renders source-bound feedback immediately after the source element when requested", () => {
+  it("renders source-bound overlay feedback after the source element when requested without moving DOM siblings", () => {
     render(
       <div>
         <QuotermHost />
@@ -54,10 +56,60 @@ describe("quoterm", () => {
     const slot = feedback.parentElement;
     expect(slot?.dataset.quotermSlot).toBe("inline");
     expect(slot?.dataset.quotermPlacement).toBe("after");
+    expect(slot?.dataset.quotermRenderMode).toBe("overlay");
     expect(slot?.classList.contains("quoterm-inline-slot")).toBe(true);
     expect(clickSource().nextElementSibling).toBe(screen.getByTestId("next-sibling"));
     expect(slot?.getAttribute("style") ?? "").toMatch(/position:\s*fixed/i);
     expect(document.querySelector(".quoterm-fallback-root")).toBeNull();
+  });
+
+  it("inserts source-bound feedback before the source element in inline render mode", () => {
+    render(
+      <div>
+        <QuotermHost renderMode="inline" />
+        <button type="button">Source action</button>
+      </div>,
+    );
+
+    Object.defineProperty(window, "innerWidth", { configurable: true, value: 1024 });
+    clickSource().getBoundingClientRect = () =>
+      ({ left: 100, right: 220, top: 100, bottom: 132, width: 120, height: 32, x: 100, y: 100, toJSON: () => ({}) }) as DOMRect;
+
+    act(() => {
+      quoterm({ source: clickSource(), title: "Inserted above", duration: 0 });
+    });
+
+    const feedback = screen.getByRole("status");
+    const slot = feedback.parentElement;
+    expect(slot?.dataset.quotermSlot).toBe("inline");
+    expect(slot?.dataset.quotermPlacement).toBe("before");
+    expect(slot?.dataset.quotermRenderMode).toBe("inline");
+    expect(clickSource().previousElementSibling).toBe(slot);
+    expect(slot?.getAttribute("style") ?? "").not.toMatch(/position:\s*fixed/i);
+    expect(slot?.getAttribute("style") ?? "").not.toMatch(/left:\s*/i);
+    expect(slot?.getAttribute("style") ?? "").not.toMatch(/top:\s*/i);
+  });
+
+  it("inserts source-bound feedback after the source element in inline render mode", () => {
+    render(
+      <div>
+        <QuotermHost renderMode="inline" />
+        <button type="button">Source action</button>
+        <span data-testid="next-sibling">Next sibling</span>
+      </div>,
+    );
+
+    act(() => {
+      quoterm({ source: clickSource(), title: "Inserted below", placement: "below", duration: 0 });
+    });
+
+    const feedback = screen.getByRole("status");
+    const slot = feedback.parentElement;
+    expect(slot?.dataset.quotermPlacement).toBe("after");
+    expect(slot?.dataset.quotermRenderMode).toBe("inline");
+    expect(clickSource().nextElementSibling).toBe(slot);
+    expect(slot?.nextElementSibling).toBe(screen.getByTestId("next-sibling"));
+    expect(slot?.getAttribute("style") ?? "").not.toMatch(/position:\s*fixed/i);
   });
 
   it("accepts bottom and below as after-placement aliases", () => {
@@ -99,6 +151,33 @@ describe("quoterm", () => {
     expect(screen.getByText(/error:/).closest("section")?.textContent).toContain("> error: Failed");
     expect(screen.getByText(/info:/).closest("section")?.textContent).toContain("> info: Queued");
     expect(document.querySelectorAll(".quoterm__prompt")).toHaveLength(4);
+  });
+
+  it("can hide terminal command and prompt chrome at the host level", () => {
+    render(
+      <div>
+        <QuotermHost showCommandChrome={false} />
+        <button type="button">Source action</button>
+      </div>,
+    );
+
+    act(() => {
+      quoterm({
+        source: clickSource(),
+        title: "Feedback only",
+        variant: "error",
+        command: "refhub feedback --error",
+        duration: 0,
+      });
+    });
+
+    const feedback = screen.getByRole("alert");
+    expect(feedback.textContent).toContain("Feedback only");
+    expect(feedback.textContent).not.toContain("$ refhub feedback --error");
+    expect(feedback.textContent).not.toContain("> error:");
+    expect(feedback.querySelector(".quoterm__command")).toBeNull();
+    expect(feedback.querySelector(".quoterm__prompt")).toBeNull();
+    expect(feedback.querySelector(".quoterm__variant")).toBeNull();
   });
 
   it("uses alert semantics for warnings and errors", () => {
