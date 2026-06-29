@@ -4,7 +4,7 @@ import { Toaster as HotToaster, toast as hotToast } from "react-hot-toast";
 import { ToastContainer, toast as toastify } from "react-toastify";
 import { Toaster as SonnerToaster, toast as sonnerToast } from "sonner";
 import { QuotermHost, dismissQuoterm, quoterm } from "quoterm";
-import type { QuotermPlacement, QuotermTheme, QuotermVariant } from "quoterm";
+import type { QuotermPlacement, QuotermRenderMode, QuotermTheme, QuotermVariant } from "quoterm";
 import "quoterm/style.css";
 import "react-toastify/dist/ReactToastify.css";
 import "./styles.css";
@@ -111,7 +111,6 @@ function ScenarioCard({
   theme: QuotermTheme;
   duration: number;
 }) {
-  const cardRef = React.useRef<HTMLElement>(null);
   const asyncTimeoutRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
@@ -120,7 +119,7 @@ function ScenarioCard({
     };
   }, []);
 
-  const fireQuoterm = () => {
+  const fireQuoterm = (source: HTMLElement) => {
     if (asyncTimeoutRef.current !== null) {
       window.clearTimeout(asyncTimeoutRef.current);
       asyncTimeoutRef.current = null;
@@ -128,7 +127,7 @@ function ScenarioCard({
 
     if (scenario.id === "async") {
       const handle = quoterm({
-        source: cardRef.current,
+        source,
         variant: "info",
         command: scenario.command,
         title: "Indexing corpus",
@@ -143,7 +142,7 @@ function ScenarioCard({
       }, 1400);
     } else {
       quoterm({
-        source: cardRef.current,
+        source,
         variant: scenario.variant,
         command: scenario.command,
         title: scenario.title,
@@ -156,14 +155,14 @@ function ScenarioCard({
   };
 
   return (
-    <article ref={cardRef} className="scenario-card" aria-label={scenario.label}>
+    <article className="scenario-card" aria-label={scenario.label}>
       <div className="scenario-info">
         <p className="eyebrow">{scenario.label}</p>
         <h2>{scenario.actionLabel}</h2>
         <p>{scenario.message}</p>
       </div>
       <div className="button-grid" aria-label={`${scenario.label} triggers`}>
-        <button type="button" onClick={fireQuoterm}>
+        <button type="button" onClick={(event) => fireQuoterm(event.currentTarget)}>
           Quoterm
         </button>
         <button type="button" onClick={() => showToastLibrary("hot", scenario)}>
@@ -178,8 +177,8 @@ function ScenarioCard({
         <button
           type="button"
           className="compare"
-          onClick={() => {
-            fireQuoterm();
+          onClick={(event) => {
+            fireQuoterm(event.currentTarget);
             showToastLibrary("hot", scenario);
             showToastLibrary("sonner", scenario);
             showToastLibrary("toastify", scenario);
@@ -194,6 +193,8 @@ function ScenarioCard({
 
 function App() {
   const [placement, setPlacement] = React.useState<QuotermPlacement>("before");
+  const [renderMode, setRenderMode] = React.useState<QuotermRenderMode>("adjacent");
+  const [showCommandChrome, setShowCommandChrome] = React.useState(false);
   const [theme, setTheme] = React.useState<QuotermTheme>("dark");
   const [duration, setDuration] = React.useState(5000);
 
@@ -209,10 +210,18 @@ function App() {
 
         <form className="playground-controls" aria-label="Quoterm controls">
           <label>
+            Render mode
+            <select value={renderMode} onChange={(e) => setRenderMode(e.currentTarget.value as QuotermRenderMode)}>
+              <option value="adjacent">Adjacent, no button shift</option>
+              <option value="overlay">Overlay, anchored</option>
+              <option value="inline">Inline, shifts layout</option>
+            </select>
+          </label>
+          <label>
             Placement
             <select value={placement} onChange={(e) => setPlacement(e.currentTarget.value as QuotermPlacement)}>
-              <option value="before">Before / above source</option>
-              <option value="after">After / below source</option>
+              <option value="before">Before / left of source</option>
+              <option value="after">After / right of source</option>
             </select>
           </label>
           <label>
@@ -221,6 +230,13 @@ function App() {
               <option value="dark">Dark</option>
               <option value="light">Light</option>
               <option value="auto">Auto</option>
+            </select>
+          </label>
+          <label>
+            Chrome
+            <select value={showCommandChrome ? "visible" : "hidden"} onChange={(e) => setShowCommandChrome(e.currentTarget.value === "visible")}>
+              <option value="hidden">Hidden command chrome</option>
+              <option value="visible">Visible command chrome</option>
             </select>
           </label>
           <label>
@@ -252,11 +268,17 @@ function App() {
 
       <section className="scenario-grid" aria-label="Feedback scenarios">
         {scenarios.map((scenario) => (
-          <ScenarioCard key={scenario.id} scenario={scenario} placement={placement} theme={theme} duration={duration} />
+          <ScenarioCard
+            key={scenario.id}
+            scenario={scenario}
+            placement={placement}
+            theme={theme}
+            duration={duration}
+          />
         ))}
       </section>
 
-      <QuotermHost maxItems={6} theme={theme} />
+      <QuotermHost maxItems={6} renderMode={renderMode} showCommandChrome={showCommandChrome} theme={theme} />
       <HotToaster position="bottom-right" />
       <SonnerToaster position="top-right" richColors closeButton />
       <ToastContainer position="bottom-left" newestOnTop theme="colored" />

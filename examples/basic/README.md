@@ -6,10 +6,11 @@ This folder documents a tiny example app that can be used later to capture READM
 
 Capture these states:
 
-1. Quoterm inserted immediately above a clicked button/control.
-2. One clear light-mode interaction each for success, warning, error, and info.
-3. Compact quote text in the form `> severity: message`, including `> info: message` for the blue info variant.
-4. Positive `duration` auto-dismisses success/info examples; `duration: 0` keeps warning/error examples persistent until closed.
+1. Quoterm anchored to a clicked button/control.
+2. Adjacent mode beside the source without shifting sibling controls.
+3. Optional terminal chrome: visible `> severity: message` for library docs, hidden chrome for product UI.
+4. One clear light-mode interaction each for success, warning, error, and info.
+5. Positive `duration` auto-dismisses success/info examples; `duration: 0` keeps warning/error examples persistent until closed.
 
 ## Minimal app sketch
 
@@ -20,10 +21,17 @@ import { QuotermHost, quoterm } from 'quoterm';
 import 'quoterm/style.css';
 
 function Demo() {
+  const [showChrome, setShowChrome] = React.useState(false);
+
   return (
     <main style={{ padding: 48 }}>
       <h1>Quoterm demo</h1>
-      <p>Click each control to insert feedback immediately above that source.</p>
+      <p>Click each control to anchor feedback beside that source.</p>
+
+      <label>
+        <input type="checkbox" checked={showChrome} onChange={(event) => setShowChrome(event.currentTarget.checked)} />
+        Show terminal chrome
+      </label>
 
       {[
         ['success', 'Save settings', 'settings saved'],
@@ -46,7 +54,7 @@ function Demo() {
         </button>
       ))}
 
-      <QuotermHost theme="light" />
+      <QuotermHost renderMode="adjacent" showCommandChrome={showChrome} theme="light" />
     </main>
   );
 }
